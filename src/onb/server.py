@@ -1,4 +1,4 @@
-"""MCP server for ONB. next_step creates the application. The other tools are not written yet."""
+"""MCP server for ONB. next_step and save_answer are live. The other tools are not written yet."""
 
 import os
 import sys
@@ -10,6 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from onb.intake import ask
+from onb.intake import save_answer as store_answer
 from onb.store import ApplicationStore
 
 mcp = MCPServer("onb")
@@ -74,7 +75,7 @@ def save_answer(
 
     A field that is not pending is rejected. This tool does not upload a file and does not submit.
     """
-    return _later("save_answer")
+    return store_answer(store, application_id, field, value)
 
 
 @mcp.tool()

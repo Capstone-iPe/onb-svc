@@ -83,3 +83,28 @@ def ask(store: ApplicationStore, application_id: str | None) -> dict:
         "pending": pending_item(snapshot),
         "snapshot": shown,
     }
+
+
+def save_answer(store: ApplicationStore, application_id: str, field: str, value: str) -> dict:
+    """Store the merchant's words for the one field that is pending.
+
+    The words are data. They do not choose a different field, skip one, or submit.
+    """
+    snapshot = store.get(application_id)
+    if snapshot is None:
+        return {"error": "unknown_application", "application_id": application_id}
+    pending = pending_item(snapshot)
+    if pending is None or pending.get("kind") != "field" or pending.get("name") != field:
+        return {"error": "field_not_pending", "field": field, "pending": pending}
+    text = value.strip()
+    if field != "note" and text == "":
+        return {"error": "empty_answer", "field": field}
+    snapshot["answers"][field] = text
+    if not store.replace(application_id, snapshot):
+        return {"error": "unknown_application", "application_id": application_id}
+    return {
+        "application_id": application_id,
+        "field": field,
+        "value": text,
+        "snapshot": shown_snapshot(snapshot),
+    }

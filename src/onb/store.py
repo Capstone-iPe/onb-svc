@@ -31,6 +31,14 @@ class ApplicationStore:
             self._rows[application_id] = copy.deepcopy(snapshot)
         return application_id
 
+    def replace(self, application_id: str, snapshot: dict) -> bool:
+        if self.database_url:
+            return self._postgres_replace(application_id, snapshot)
+        if application_id not in self._rows:
+            return False
+        self._rows[application_id] = copy.deepcopy(snapshot)
+        return True
+
     def get(self, application_id: str) -> dict | None:
         if self.database_url:
             return self._postgres_get(application_id)
@@ -77,6 +85,17 @@ class ApplicationStore:
                 "INSERT INTO applications (id, snapshot) VALUES (%s, %s)",
                 (application_id, Jsonb(snapshot)),
             )
+
+    def _postgres_replace(self, application_id: str, snapshot: dict) -> bool:
+        from psycopg.types.json import Jsonb
+
+        self._ensure_table()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE applications SET snapshot = %s WHERE id = %s",
+                (Jsonb(snapshot), application_id),
+            )
+        return cursor.rowcount == 1
 
     def _postgres_get(self, application_id: str) -> dict | None:
         self._ensure_table()
