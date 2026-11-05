@@ -1,4 +1,4 @@
-"""MCP server for ONB. next_step and save_answer are live. The other tools are not written yet."""
+"""MCP server for ONB. next_step, save_answer, and save_file are live. submit and get_review are not written yet."""
 
 import os
 import sys
@@ -11,6 +11,7 @@ from starlette.responses import JSONResponse
 
 from onb.intake import ask
 from onb.intake import save_answer as store_answer
+from onb.intake import save_file as store_file
 from onb.store import ApplicationStore
 
 mcp = MCPServer("onb")
@@ -116,9 +117,9 @@ def save_file(
 
     Call this only when next_step says an upload slot is pending. A real file is checked by the document verifier. A rejected file leaves that same slot pending. The signed addendum is a file. A sentence in the note does not replace it.
 
-    After submit, an accepted file runs the rules again and keeps the same review id. This tool does not activate the shop and does not submit by itself.
+    This tool does not activate the shop and does not submit by itself.
     """
-    return _later("save_file")
+    return store_file(store, application_id, slot, file, missing)
 
 
 @mcp.tool()

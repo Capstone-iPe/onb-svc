@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import copy
+from datetime import date
 from typing import TYPE_CHECKING
+
+from onb.verifier import MockDocumentVerifier, file_bytes
 
 if TYPE_CHECKING:
     from onb.store import ApplicationStore
+    from onb.verifier import DocumentVerifier
 
 ANSWER_FIELDS = (
     "shop_name",
@@ -106,5 +110,59 @@ def save_answer(store: ApplicationStore, application_id: str, field: str, value:
         "application_id": application_id,
         "field": field,
         "value": text,
+        "snapshot": shown_snapshot(snapshot),
+    }
+
+
+def save_file(
+    store: ApplicationStore,
+    application_id: str,
+    slot: str,
+    file: str | None = None,
+    missing: bool = False,
+    verifier: DocumentVerifier | None = None,
+    submit_date: str | None = None,
+) -> dict:
+    """Store one upload, or close a slot the merchant does not have.
+
+    The verifier decides accepted. This function does not.
+    """
+    snapshot = store.get(application_id)
+    if snapshot is None:
+        return {"error": "unknown_application", "application_id": application_id}
+    pending = pending_item(snapshot)
+    if pending is None or pending.get("kind") != "upload" or pending.get("name") != slot:
+        return {"error": "slot_not_pending", "slot": slot, "pending": pending}
+    payload = file_bytes(file)
+    if missing and payload:
+        return {"error": "file_and_missing", "slot": slot}
+    if missing:
+        snapshot["files"][slot] = {"state": "missing"}
+        if not store.replace(application_id, snapshot):
+            return {"error": "unknown_application", "application_id": application_id}
+        return {
+            "application_id": application_id,
+            "slot": slot,
+            "state": "missing",
+            "snapshot": shown_snapshot(snapshot),
+        }
+    if not payload:
+        return {"error": "file_missing", "slot": slot}
+    checker = verifier or MockDocumentVerifier()
+    shop_name = str(snapshot["answers"].get("shop_name") or "")
+    result = checker.verify(slot, shop_name, payload, submit_date or date.today().isoformat())
+    accepted = bool(result.get("accepted"))
+    reason_code = str(result.get("reason_code") or ("ok" if accepted else "rejected"))
+    snapshot["files"][slot] = {
+        "state": "accepted" if accepted else "pending",
+        "reason_code": reason_code,
+    }
+    if not store.replace(application_id, snapshot):
+        return {"error": "unknown_application", "application_id": application_id}
+    return {
+        "application_id": application_id,
+        "slot": slot,
+        "state": snapshot["files"][slot]["state"],
+        "reason_code": reason_code,
         "snapshot": shown_snapshot(snapshot),
     }
