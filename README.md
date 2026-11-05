@@ -8,6 +8,7 @@ The five tools are registered. `next_step` creates the application and returns t
 
 ```
 src/onb/server.py     MCP process and the five tool names
+src/onb/auth.py       Google sign-in for Claude and ChatGPT
 src/onb/store.py      Application rows. Postgres when `DATABASE_URL` is set, memory otherwise.
 src/onb/verifier.py   Document Verifier seam, called only from this process
 ```
@@ -22,7 +23,9 @@ pytest
 python -m onb
 ```
 
-`python -m onb` listens on `http://0.0.0.0:8000/mcp`. Render sets `PORT`; locally the port is 8000. `GET /health` is the health check. Ctrl+C stops it.
+`python -m onb` listens on `http://0.0.0.0:8000/mcp`. Render sets `PORT`; locally the port is 8000. `GET /health` is the health check and stays open. Ctrl+C stops it.
+
+When `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, `/mcp` answers 401 until the caller sends a bearer token. Claude and ChatGPT open a browser, this process sends that browser to Google, and Google returns it to `/auth/google/callback`. This process then gives their app its own token. The secret stays in the environment. `ONB_PUBLIC_URL` is the public origin, with no path. On Render it defaults to `https://onb-k8ud.onrender.com`, which is the redirect already registered with Google. `GOOGLE_ALLOWED_EMAILS` is an optional comma-separated list. When it is unset, any verified Google account that passes Google's consent screen is accepted. A restart drops the sign-in. The person signs in again.
 
 Tool calls are logged to stderr. Render shows those lines on the service Logs page. The lines name the tool and the result. They do not include the merchant's answer or the file.
 

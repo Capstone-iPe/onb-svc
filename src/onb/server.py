@@ -1,13 +1,16 @@
-"""MCP server for ONB. next_step, save_answer, and save_file are live. submit and get_review are not written yet."""
+"""MCP server for ONB. next_step, save_answer, and save_file are live. submit and get_review are not written yet.
+
+When GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set, /mcp requires a bearer token. /health stays open.
+"""
 
 import os
 from typing import Annotated
 
-from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from onb.auth import build_mcp
 from onb.intake import ask
 from onb.intake import save_answer as store_answer
 from onb.intake import save_file as store_file
@@ -16,7 +19,7 @@ from onb.log import log_result
 from onb.log import logger
 from onb.store import ApplicationStore
 
-mcp = MCPServer("onb")
+mcp, google_sign_in = build_mcp()
 store = ApplicationStore.from_env()
 
 
@@ -170,6 +173,10 @@ def main() -> None:
     host = "0.0.0.0"
     port = int(os.environ.get("PORT", "8000"))
     configure()
+    if google_sign_in:
+        logger.info("google sign-in is on")
+    else:
+        logger.info("google sign-in is off")
     logger.info("listening on http://%s:%s/mcp", host, port)
     mcp.run(
         transport="streamable-http",
