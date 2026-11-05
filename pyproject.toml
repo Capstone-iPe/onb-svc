@@ -1,6 +1,6 @@
 [project]
 name = "onb"
-version = "0.0.0"
+version = "0.0.1"
 description = "iPe onboarding rules. Deterministic Python, no model."
 requires-python = ">=3.12"
 dependencies = [

@@ -9,10 +9,12 @@ services:
     name: onb
     runtime: python
     plan: free
-    buildCommand: pip install .
+    buildCommand: pip install --upgrade --force-reinstall --no-deps . && pip install .
     startCommand: python -m onb
     healthCheckPath: /health
     envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: DATABASE_URL
         fromDatabase:
           name: onb-db

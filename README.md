@@ -24,7 +24,7 @@ python -m onb
 
 `python -m onb` listens on `http://0.0.0.0:8000/mcp`. Render sets `PORT`; locally the port is 8000. `GET /health` is the health check. Ctrl+C stops it.
 
-Tool calls are logged to stdout. Render shows those lines on the service Logs page. The lines name the tool and the result. They do not include the merchant's answer or the file.
+Tool calls are logged to stderr. Render shows those lines on the service Logs page. The lines name the tool and the result. They do not include the merchant's answer or the file.
 
 Cursor connects by URL, once the process is running:
 

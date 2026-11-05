@@ -1,4 +1,4 @@
-"""Application logs on stdout. Render keeps those lines. Do not log answer text or file bytes."""
+"""Application logs on stderr. Render keeps those lines. Do not log answer text or file bytes."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class _Formatter(logging.Formatter):
 def configure() -> None:
     if logger.handlers:
         return
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(_Formatter("%(levelname)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
