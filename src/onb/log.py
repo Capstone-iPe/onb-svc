@@ -24,6 +24,7 @@ def configure() -> None:
     handler.setFormatter(_Formatter("%(levelname)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 def log_result(tool: str, result: dict) -> None:
