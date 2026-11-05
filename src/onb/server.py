@@ -1,4 +1,4 @@
-"""MCP server for ONB. The five tools are named here. Their behaviour is not written yet."""
+"""MCP server for ONB. next_step creates the application. The other tools are not written yet."""
 
 import os
 import sys
@@ -9,6 +9,7 @@ from pydantic import Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from onb.intake import ask
 from onb.store import ApplicationStore
 
 mcp = MCPServer("onb")
@@ -44,7 +45,7 @@ def next_step(
 
     This tool does not save an answer, store a file, or submit.
     """
-    return _later("next_step")
+    return ask(store, application_id)
 
 
 @mcp.tool()

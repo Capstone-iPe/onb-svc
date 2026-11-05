@@ -2,13 +2,13 @@
 
 The onboarding rules service for the iPe Merchant Onboarding Copilot. One Python process. No model. The copilot calls it over MCP. This process owns the application, the files, and the verdict.
 
-The five tools are registered. They do not decide anything yet.
+The five tools are registered. `next_step` creates the application and returns the pending item plus the snapshot. The other four do not decide anything yet.
 
 ## Layout
 
 ```
 src/onb/server.py     MCP process and the five tool names
-src/onb/store.py      Render Postgres connection (`DATABASE_URL`). Tables come later.
+src/onb/store.py      Application rows. Postgres when `DATABASE_URL` is set, memory otherwise.
 src/onb/verifier.py   Document Verifier seam, called only from this process
 ```
 
@@ -38,4 +38,4 @@ Cursor connects by URL, once the process is running:
 
 After Render deploys the service, replace that URL with the Render URL and keep the `/mcp` path.
 
-`render.yaml` creates the web service and a free Render Postgres database named `onb-db`. The service receives `DATABASE_URL`. The tables are not designed yet. The free database expires 30 days after creation.
+`render.yaml` creates the web service and a free Render Postgres database named `onb-db`. The service receives `DATABASE_URL`. Each application is one row: an id and the snapshot. Verdict columns are not designed yet. The free database expires 30 days after creation. Without `DATABASE_URL`, applications stay in memory for the life of the process.

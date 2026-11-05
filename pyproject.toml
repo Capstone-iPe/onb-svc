@@ -5,6 +5,7 @@ description = "iPe onboarding rules. Deterministic Python, no model."
 requires-python = ">=3.12"
 dependencies = [
     "mcp>=1.2",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]
