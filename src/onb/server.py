@@ -6,10 +6,13 @@ When GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set, /mcp requires a bearer t
 import os
 from typing import Annotated
 
+import anyio
+import uvicorn
 from pydantic import Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from onb.auth import SignInChallenge
 from onb.auth import build_mcp
 from onb.intake import ask
 from onb.intake import save_answer as store_answer
@@ -178,12 +181,15 @@ def main() -> None:
     else:
         logger.info("google sign-in is off")
     logger.info("listening on http://%s:%s/mcp", host, port)
-    mcp.run(
-        transport="streamable-http",
-        host=host,
-        port=port,
-        streamable_http_path="/mcp",
-    )
+
+    async def serve() -> None:
+        app = mcp.streamable_http_app(streamable_http_path="/mcp", host=host)
+        if google_sign_in:
+            app = SignInChallenge(app)
+        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        await uvicorn.Server(config).serve()
+
+    anyio.run(serve)
 
 
 if __name__ == "__main__":

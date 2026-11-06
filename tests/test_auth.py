@@ -8,7 +8,7 @@ from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, Re
 from mcp.server.mcpserver import MCPServer
 from starlette.responses import JSONResponse
 
-from onb.auth import GoogleAuthProvider, redirect_allowed
+from onb.auth import GoogleAuthProvider, SignInChallenge, protected_resource_document, redirect_allowed
 
 
 def test_redirect_allow_list():
@@ -28,17 +28,20 @@ def test_mcp_without_a_bearer_is_401_and_health_stays_open():
 
     async def run():
         missing = await _call(app, "POST", "/mcp")
+        rejected = await _call(app, "POST", "/mcp", extra_headers=[(b"authorization", b"Bearer nope")])
         health = await _call(app, "GET", "/health")
         resource = await _call(app, "GET", "/.well-known/oauth-protected-resource/mcp")
+        root = await _call(app, "GET", "/.well-known/oauth-protected-resource")
         server = await _call(app, "GET", "/.well-known/oauth-authorization-server")
-        return missing, health, resource, server
+        return missing, rejected, health, resource, root, server
 
-    missing, health, resource, server = asyncio.run(run())
+    missing, rejected, health, resource, root, server = asyncio.run(run())
     assert missing[0] == 401
-    assert (
-        'resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/mcp"'
-        in missing[1]["www-authenticate"]
+    assert missing[1]["www-authenticate"] == (
+        'Bearer resource_metadata="http://127.0.0.1:8000/.well-known/oauth-protected-resource/mcp", scope="openid"'
     )
+    assert 'error="invalid_token"' in rejected[1]["www-authenticate"]
+    assert json.loads(root[2]) == protected_resource_document("http://127.0.0.1:8000", "http://127.0.0.1:8000/mcp")
     assert health[0] == 200
     assert json.loads(health[2]) == {"status": "ok"}
     resource_body = json.loads(resource[2])
@@ -209,10 +212,14 @@ def _app(exchange, allowed=frozenset()):
     async def google_callback(request):
         return await provider.handle_google_callback(request)
 
-    return server.streamable_http_app(), provider
+    @server.custom_route("/.well-known/oauth-protected-resource", methods=["GET"])
+    async def protected_resource_root(_request):
+        return JSONResponse(protected_resource_document("http://127.0.0.1:8000", "http://127.0.0.1:8000/mcp"))
+
+    return SignInChallenge(server.streamable_http_app()), provider
 
 
-async def _call(app, method, path, query=None, json_body=None, form=None):
+async def _call(app, method, path, query=None, json_body=None, form=None, extra_headers=None):
     payload = b""
     headers = []
     if json_body is not None:
@@ -221,6 +228,7 @@ async def _call(app, method, path, query=None, json_body=None, form=None):
     elif form is not None:
         payload = urlencode(form).encode()
         headers.append((b"content-type", b"application/x-www-form-urlencoded"))
+    headers.extend(extra_headers or [])
     headers.append((b"content-length", str(len(payload)).encode()))
     query_string = urlencode(query or {}).encode()
     status = {}
