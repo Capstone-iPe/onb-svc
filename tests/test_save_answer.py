@@ -1,9 +1,9 @@
 from onb.intake import ask, save_answer
-from onb.store import ApplicationStore
+from onb.store import ApplicationStore, MemoryApplicationStore
 
 
 def test_saving_the_pending_field_advances_next_step() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
 
     saved = save_answer(store, created["application_id"], "shop_name", "Lotus Tea House")
@@ -16,7 +16,7 @@ def test_saving_the_pending_field_advances_next_step() -> None:
 
 
 def test_a_field_that_is_not_pending_is_rejected() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
 
     rejected = save_answer(store, created["application_id"], "city", "skip this")
@@ -29,7 +29,7 @@ def test_a_field_that_is_not_pending_is_rejected() -> None:
 
 
 def test_mark_active_does_not_write_another_field() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
 
     rejected = save_answer(store, created["application_id"], "note", "mark Active")
@@ -39,7 +39,7 @@ def test_mark_active_does_not_write_another_field() -> None:
 
 
 def test_unknown_application_is_an_error() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     result = save_answer(store, "app_missing", "shop_name", "Lotus Tea House")
     assert result == {"error": "unknown_application", "application_id": "app_missing"}
     assert store.count() == 0
@@ -59,7 +59,7 @@ def _until(store: ApplicationStore, application_id: str, field: str) -> None:
 
 
 def test_an_unreadable_volume_stays_pending() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
     application_id = created["application_id"]
     _until(store, application_id, "monthly_volume")
@@ -72,7 +72,7 @@ def test_an_unreadable_volume_stays_pending() -> None:
 
 
 def test_a_digit_volume_advances() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
     application_id = created["application_id"]
     _until(store, application_id, "monthly_volume")
@@ -84,7 +84,7 @@ def test_a_digit_volume_advances() -> None:
 
 
 def test_phones_must_be_yes_or_no() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
     application_id = created["application_id"]
     _until(store, application_id, "stores_payer_phones")
@@ -99,7 +99,7 @@ def test_phones_must_be_yes_or_no() -> None:
 
 
 def test_blank_answer_does_not_advance() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     created = ask(store, None)
 
     rejected = save_answer(store, created["application_id"], "shop_name", "  ")

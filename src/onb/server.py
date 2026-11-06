@@ -22,10 +22,10 @@ from onb.intake import submit as run_submit
 from onb.log import configure
 from onb.log import log_result
 from onb.log import logger
-from onb.store import ApplicationStore
+from onb.store import open_application_store
 
 mcp, google_sign_in = build_mcp()
-store = ApplicationStore.from_env()
+store = open_application_store()
 
 
 @mcp.custom_route("/health", methods=["GET"])

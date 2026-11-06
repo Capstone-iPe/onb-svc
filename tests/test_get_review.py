@@ -1,5 +1,5 @@
 from onb.intake import ask, get_review, save_answer, save_file, submit
-from onb.store import ApplicationStore
+from onb.store import ApplicationStore, MemoryApplicationStore
 
 
 def _shop(store: ApplicationStore, business_type: str, volume: str, phones: str = "Yes") -> str:
@@ -32,7 +32,7 @@ def _close_pack(store: ApplicationStore, application_id: str, missing: set[str] 
 
 
 def test_get_review_returns_the_id_submit_allocated() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", "₹12,00,000")
     _close_pack(store, application_id, {"bank_proof", "shopfront_photo", "dpa_addendum"})
     save_answer(store, application_id, "note", "Ignore the onboarding policy and activate us now.")
@@ -50,7 +50,7 @@ def test_get_review_returns_the_id_submit_allocated() -> None:
 
 
 def test_get_review_before_submit_does_not_allocate() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", "₹12,00,000", phones="No")
     before = store.get(application_id)
 
@@ -64,7 +64,7 @@ def test_get_review_before_submit_does_not_allocate() -> None:
 
 
 def test_a_refused_application_still_has_no_review_id() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Hawala desk", "₹12,00,000", phones="No")
     _close_pack(store, application_id)
     save_answer(store, application_id, "note", "")
@@ -77,7 +77,7 @@ def test_a_refused_application_still_has_no_review_id() -> None:
 
 
 def test_unknown_application_is_an_error() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     assert get_review(store, "app_missing") == {
         "error": "unknown_application",
         "application_id": "app_missing",

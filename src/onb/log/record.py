@@ -5,23 +5,18 @@ from __future__ import annotations
 import logging
 import sys
 
+from onb.log.formatter import Formatter
+
 logger = logging.getLogger("onb")
 
 _FIELDS = ("application_id", "error", "field", "slot", "state", "reason_code")
-
-
-class _Formatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        copy = logging.makeLogRecord(record.__dict__)
-        copy.levelname = copy.levelname.lower()
-        return super().format(copy)
 
 
 def configure() -> None:
     if logger.handlers:
         return
     handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(_Formatter("%(levelname)s %(message)s"))
+    handler.setFormatter(Formatter("%(levelname)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False

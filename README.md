@@ -9,10 +9,15 @@ There is no activate, waive, change-volume, or mark-complete tool. [ADR-0001 D6]
 ## Layout
 
 ```
-src/onb/server.py     MCP process and the five tool names
-src/onb/auth.py       Google sign-in for Claude and ChatGPT
-src/onb/store.py      Application rows. Postgres when `DATABASE_URL` is set, memory otherwise.
-src/onb/verifier.py   Document Verifier seam, called only from this process
+src/onb/server.py     MCP tools. This is the process entry.
+src/onb/intake/       What to ask next, and what a save may write.
+src/onb/rules/        The verdict.
+src/onb/verifier/     Document check. One class per file.
+src/onb/store/        Application rows. One class per file.
+src/onb/clients/      MCP client registrations. One class per file.
+src/onb/auth/         Google sign-in. One class per file.
+src/onb/log/          The lines Render keeps.
+src/onb/postgres/     The database connection.
 ```
 
 ## Run

@@ -1,5 +1,5 @@
 from onb.intake import ask, save_answer, save_file
-from onb.store import ApplicationStore
+from onb.store import ApplicationStore, MemoryApplicationStore
 from onb.verifier import MockDocumentVerifier
 
 
@@ -20,7 +20,7 @@ def _at_registration(store: ApplicationStore) -> str:
 
 
 def test_an_accepted_file_closes_the_slot() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _at_registration(store)
 
     saved = save_file(store, application_id, "business_registration", "registration.pdf")
@@ -33,7 +33,7 @@ def test_an_accepted_file_closes_the_slot() -> None:
 
 
 def test_a_rejected_file_leaves_the_slot_pending() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _at_registration(store)
 
     saved = save_file(store, application_id, "business_registration", "registration.docx")
@@ -45,7 +45,7 @@ def test_a_rejected_file_leaves_the_slot_pending() -> None:
 
 
 def test_missing_closes_the_slot_as_a_gap() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _at_registration(store)
 
     saved = save_file(store, application_id, "business_registration", missing=True)
@@ -57,7 +57,7 @@ def test_missing_closes_the_slot_as_a_gap() -> None:
 
 
 def test_attached_with_no_file_does_not_count() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _at_registration(store)
 
     saved = save_file(store, application_id, "business_registration", "attached")
@@ -69,7 +69,7 @@ def test_attached_with_no_file_does_not_count() -> None:
 
 
 def test_a_slot_that_is_not_pending_is_rejected() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _at_registration(store)
 
     saved = save_file(store, application_id, "owner_id", "owner.pdf")
@@ -102,6 +102,6 @@ def test_shopfront_older_than_90_days_is_rejected() -> None:
 
 
 def test_unknown_application_is_an_error() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     result = save_file(store, "app_missing", "business_registration", "registration.pdf")
     assert result == {"error": "unknown_application", "application_id": "app_missing"}

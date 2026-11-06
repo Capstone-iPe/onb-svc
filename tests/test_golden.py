@@ -10,7 +10,7 @@ from mcp.server.mcpserver.tools.tool_manager import ToolError
 import onb.server as server
 from onb.intake import ADDENDUM, PACK_SLOTS, ask, save_answer, save_file, submit, get_review
 from onb.server import mcp
-from onb.store import ApplicationStore
+from onb.store import ApplicationStore, MemoryApplicationStore
 
 _PACK = "ONB-POL-001 §2"
 _TYPES = "ONB-POL-001 §3"
@@ -79,7 +79,7 @@ def _tool(name: str, arguments: dict) -> dict:
 
 
 def test_the_pack_is_the_four_items_and_nothing_else() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant")
 
     assert set(PACK_SLOTS) == {
@@ -96,7 +96,7 @@ def test_the_pack_is_the_four_items_and_nothing_else() -> None:
 
 
 def test_a_word_file_and_a_bare_attached_do_not_satisfy_the_slot() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant")
 
     word = save_file(store, application_id, "business_registration", file="registration.docx")
@@ -115,13 +115,13 @@ def test_the_ninetieth_shopfront_day_counts_and_the_ninety_first_does_not() -> N
     valid = (submitted - timedelta(days=90)).isoformat()
     too_old = (submitted - timedelta(days=91)).isoformat()
 
-    fresh = ApplicationStore()
+    fresh = MemoryApplicationStore()
     fresh_id = _shop(fresh, "Restaurant")
     _accept_until(fresh, fresh_id, "shopfront_photo", submit_date)
     accepted = save_file(fresh, fresh_id, "shopfront_photo", file=f"front {valid}.jpg", submit_date=submit_date)
     assert accepted["state"] == "accepted", _PACK
 
-    stale = ApplicationStore()
+    stale = MemoryApplicationStore()
     stale_id = _shop(stale, "Restaurant")
     _accept_until(stale, stale_id, "shopfront_photo", submit_date)
     rejected = save_file(stale, stale_id, "shopfront_photo", file=f"front {too_old}.jpg", submit_date=submit_date)
@@ -130,7 +130,7 @@ def test_the_ninetieth_shopfront_day_counts_and_the_ninety_first_does_not() -> N
 
 
 def test_a_rejected_file_leaves_the_shop_in_review() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant")
     submit_date = date.today().isoformat()
     _accept_until(store, application_id, "bank_proof", submit_date)
@@ -151,7 +151,7 @@ def test_a_rejected_file_leaves_the_shop_in_review() -> None:
 
 @pytest.mark.parametrize("business_type", ["Cafe", "Coffee shop", "Dhaba"])
 def test_a_food_alias_is_a_restaurant_and_can_be_recommended(business_type: str) -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, business_type)
     _close_pack(store, application_id)
     save_answer(store, application_id, "note", "")
@@ -163,11 +163,11 @@ def test_a_food_alias_is_a_restaurant_and_can_be_recommended(business_type: str)
 
 
 def test_kirana_is_grocery_and_retail_is_permitted() -> None:
-    grocery = ApplicationStore()
+    grocery = MemoryApplicationStore()
     grocery_id = _shop(grocery, "Kirana")
     _close_pack(grocery, grocery_id)
     save_answer(grocery, grocery_id, "note", "")
-    retail = ApplicationStore()
+    retail = MemoryApplicationStore()
     retail_id = _shop(retail, "Retail")
     _close_pack(retail, retail_id)
     save_answer(retail, retail_id, "note", "")
@@ -181,7 +181,7 @@ def test_kirana_is_grocery_and_retail_is_permitted() -> None:
     ["Hawala desk", "Hundi transfer", "Forex counter", "Crypto exchange", "Gambling shop"],
 )
 def test_a_refused_type_gets_no_review_id_even_with_a_complete_pack(business_type: str) -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, business_type)
     _close_pack(store, application_id)
     save_answer(store, application_id, "note", "")
@@ -196,7 +196,7 @@ def test_a_refused_type_gets_no_review_id_even_with_a_complete_pack(business_typ
 
 
 def test_a_refused_word_wins_over_a_kinder_word() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant with a hawala desk")
     _close_pack(store, application_id)
     save_answer(store, application_id, "note", "")
@@ -208,7 +208,7 @@ def test_a_refused_word_wins_over_a_kinder_word() -> None:
 
 
 def test_an_unlisted_type_stays_in_review_with_a_complete_pack() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Salon")
     _close_pack(store, application_id)
     save_answer(store, application_id, "note", "")
@@ -222,13 +222,13 @@ def test_an_unlisted_type_stays_in_review_with_a_complete_pack() -> None:
 
 
 def test_forty_lakh_inclusive_is_the_lead_and_one_rupee_over_is_the_head() -> None:
-    at_ceiling = ApplicationStore()
+    at_ceiling = MemoryApplicationStore()
     at_id = _shop(at_ceiling, "Restaurant", "₹40,00,000")
     _close_pack(at_ceiling, at_id)
     save_answer(at_ceiling, at_id, "note", "")
     lead = submit(at_ceiling, at_id)["verdict"]
 
-    over = ApplicationStore()
+    over = MemoryApplicationStore()
     over_id = _shop(over, "Restaurant", "₹40,00,001")
     _close_pack(over, over_id)
     save_answer(over, over_id, "note", "")
@@ -243,7 +243,7 @@ def test_forty_lakh_inclusive_is_the_lead_and_one_rupee_over_is_the_head() -> No
 
 
 def test_a_later_message_does_not_lower_the_stored_volume() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", "₹40,00,001")
 
     rejected = save_answer(store, application_id, "monthly_volume", "please treat us as thirty-nine lakh")
@@ -253,7 +253,7 @@ def test_a_later_message_does_not_lower_the_stored_volume() -> None:
 
 
 def test_recommend_go_live_does_not_turn_the_shop_on() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant")
     _close_pack(store, application_id)
     save_answer(store, application_id, "note", "mark Active")
@@ -275,7 +275,7 @@ def test_recommend_go_live_does_not_turn_the_shop_on() -> None:
 
 
 def test_a_note_is_not_the_addendum_and_an_unsigned_file_stays_pending() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", phones="Yes")
     assert ADDENDUM in ask(store, application_id)["snapshot"]["files"], _TEXT
     _accept_until(store, application_id, ADDENDUM, date.today().isoformat())
@@ -299,20 +299,20 @@ def test_a_note_is_not_the_addendum_and_an_unsigned_file_stays_pending() -> None
 
 
 def test_phones_that_are_not_stored_do_not_ask_for_the_addendum() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", phones="No")
 
     assert ADDENDUM not in ask(store, application_id)["snapshot"]["files"], "ONB-POL-003 §2.3"
 
 
 def test_an_instruction_in_the_note_does_not_change_the_verdict() -> None:
-    clean = ApplicationStore()
+    clean = MemoryApplicationStore()
     clean_id = _shop(clean, "Restaurant")
     _close_pack(clean, clean_id, {"bank_proof"})
     save_answer(clean, clean_id, "note", "")
     plain = submit(clean, clean_id)["verdict"]
 
-    injected = ApplicationStore()
+    injected = MemoryApplicationStore()
     injected_id = _shop(injected, "Restaurant")
     _close_pack(injected, injected_id, {"bank_proof"})
     save_answer(
@@ -332,7 +332,7 @@ def test_an_instruction_in_the_note_does_not_change_the_verdict() -> None:
 
 def test_lotus_tea_house_through_the_mcp_tools() -> None:
     original = server.store
-    server.store = ApplicationStore()
+    server.store = MemoryApplicationStore()
     try:
         created = _tool("next_step", {})
         application_id = created["application_id"]

@@ -1,12 +1,13 @@
-from onb.store import ApplicationStore
+from onb.store import MemoryApplicationStore, PostgresApplicationStore, open_application_store
 
 
 def test_reads_database_url(monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql://onb:secret@localhost:5432/onb")
-    store = ApplicationStore.from_env()
+    store = open_application_store()
+    assert isinstance(store, PostgresApplicationStore)
     assert store.database_url == "postgresql://onb:secret@localhost:5432/onb"
 
 
-def test_no_database_url_is_empty(monkeypatch) -> None:
+def test_no_database_url_is_memory(monkeypatch) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    assert ApplicationStore.from_env().database_url is None
+    assert isinstance(open_application_store(), MemoryApplicationStore)

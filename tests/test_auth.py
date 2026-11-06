@@ -13,6 +13,7 @@ from pydantic import AnyUrl
 from starlette.responses import JSONResponse
 
 from onb.auth import GoogleAuthProvider, SignInChallenge, protected_resource_document, redirect_allowed
+from onb.clients import ClientDirectory
 
 
 def test_redirect_allow_list():
@@ -102,7 +103,7 @@ def test_a_registered_client_is_still_there_after_the_process_restarts() -> None
     assert str(found.redirect_uris[0]) == "https://chatgpt.com/connector/oauth/cb_123"
 
 
-class _RememberedClients:
+class _RememberedClients(ClientDirectory):
     """Stores the registration the way Postgres does: as data, not as the live object."""
 
     def __init__(self) -> None:

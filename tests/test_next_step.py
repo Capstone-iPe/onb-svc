@@ -1,5 +1,5 @@
 from onb.intake import ask, empty_snapshot, pending_item
-from onb.store import ApplicationStore
+from onb.store import MemoryApplicationStore
 
 ANSWERS = (
     "shop_name",
@@ -19,7 +19,7 @@ PACK = (
 
 
 def test_first_call_creates_one_application_and_asks_for_the_shop_name() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     result = ask(store, None)
 
     assert store.count() == 1
@@ -32,7 +32,7 @@ def test_first_call_creates_one_application_and_asks_for_the_shop_name() -> None
 
 
 def test_same_id_does_not_create_a_second_application() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     first = ask(store, None)
     second = ask(store, first["application_id"])
 
@@ -42,7 +42,7 @@ def test_same_id_does_not_create_a_second_application() -> None:
 
 
 def test_unknown_id_is_an_error_and_does_not_create() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     result = ask(store, "app_missing")
 
     assert result == {"error": "unknown_application", "application_id": "app_missing"}
@@ -50,7 +50,7 @@ def test_unknown_id_is_an_error_and_does_not_create() -> None:
 
 
 def test_blank_id_creates() -> None:
-    store = ApplicationStore()
+    store = MemoryApplicationStore()
     result = ask(store, "  ")
     assert store.count() == 1
     assert result["pending"]["name"] == "shop_name"

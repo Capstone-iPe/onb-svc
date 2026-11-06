@@ -1,6 +1,5 @@
-"""Document Verifier seam. ONB calls this. The copilot never writes accepted.
+"""Format check plus fixture hints. There is no OCR.
 
-The mock checks the format and a few fixture hints. It does not read a real document.
 PDF, JPG, and PNG are the allowed formats. A file is rejected when the text contains
 "reject", a bank proof says "personal" and not the shop's legal name, a shopfront
 date is more than 90 days before submit_date, or an addendum says "unsigned".
@@ -8,36 +7,12 @@ date is more than 90 days before submit_date, or an addendum says "unsigned".
 
 from __future__ import annotations
 
-import base64
 import re
 from datetime import date
-from typing import Protocol
+
+from onb.verifier.document_verifier import DocumentVerifier
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
-
-
-class DocumentVerifier(Protocol):
-    def verify(self, slot: str, shop_name: str, file: bytes, submit_date: str) -> dict:
-        """Return whether the file is accepted for this slot."""
-
-
-def file_bytes(file: str | None) -> bytes:
-    """Turn the copilot's file string into bytes. "Attached" with no file is empty."""
-    if file is None:
-        return b""
-    text = file.strip()
-    if text == "" or text.lower() == "attached":
-        return b""
-    payload = text
-    if payload.startswith("data:") and "base64," in payload:
-        payload = payload.split("base64,", 1)[1]
-    try:
-        decoded = base64.b64decode(payload, validate=True)
-    except Exception:
-        decoded = b""
-    if decoded:
-        return decoded
-    return text.encode("utf-8")
 
 
 def _format(file: bytes) -> str | None:
@@ -66,9 +41,7 @@ def _photo_too_old(text: str, submit_date: str) -> bool:
     return False
 
 
-class MockDocumentVerifier:
-    """Format check plus fixture hints. There is no OCR."""
-
+class MockDocumentVerifier(DocumentVerifier):
     def verify(self, slot: str, shop_name: str, file: bytes, submit_date: str) -> dict:
         if not file:
             return {"accepted": False, "reason_code": "no_bytes"}
