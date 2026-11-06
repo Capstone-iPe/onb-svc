@@ -35,6 +35,9 @@ def log_result(tool: str, result: dict) -> None:
     pending = result.get("pending")
     if isinstance(pending, dict) and pending.get("name"):
         parts.append(f"pending={pending['name']}")
+    verdict = result.get("verdict")
+    if isinstance(verdict, dict) and verdict.get("outcome"):
+        parts.append(f"outcome={verdict['outcome']}")
     line = " ".join(parts)
     if result.get("error"):
         logger.warning(line)

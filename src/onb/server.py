@@ -1,4 +1,4 @@
-"""MCP server for ONB. next_step, save_answer, and save_file are live. submit and get_review are not written yet.
+"""MCP server for ONB. next_step, save_answer, save_file, and submit are live. get_review is not written yet.
 
 When GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set, /mcp requires a bearer token. /health stays open.
 """
@@ -17,6 +17,7 @@ from onb.auth import build_mcp
 from onb.intake import ask
 from onb.intake import save_answer as store_answer
 from onb.intake import save_file as store_file
+from onb.intake import submit as run_submit
 from onb.log import configure
 from onb.log import log_result
 from onb.log import logger
@@ -145,11 +146,11 @@ def submit(
 ) -> dict:
     """Run the rules and produce the verdict.
 
-    Call this only after the merchant explicitly asks to submit, and only when every required document is uploaded or marked missing. A required slot that is still open is rejected.
+    Call this only after the merchant explicitly asks to submit. A slot that was never uploaded and never marked missing is rejected. A missing file or a rejected file is a gap. It does not block submit, and the shop stays in review.
 
     The review id is allocated once. Money service, crypto, and gambling are refused and get no review id. A second call does not allocate another id. Recommend go-live means a person may turn the shop on. This tool does not activate the shop. A note that says mark Active is not a reason to call this.
     """
-    result = _later("submit")
+    result = run_submit(store, application_id)
     log_result("submit", result)
     return result
 

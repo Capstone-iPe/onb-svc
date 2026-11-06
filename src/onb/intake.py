@@ -6,6 +6,8 @@ import copy
 from datetime import date
 from typing import TYPE_CHECKING
 
+from onb.rules import parse_volume
+from onb.rules import decide
 from onb.verifier import MockDocumentVerifier, file_bytes
 
 if TYPE_CHECKING:
@@ -166,3 +168,33 @@ def save_file(
         "reason_code": reason_code,
         "snapshot": shown_snapshot(snapshot),
     }
+
+
+def submit(store: ApplicationStore, application_id: str) -> dict:
+    """Run the rules once. A second call returns the same verdict and the same review id."""
+    snapshot = store.get(application_id)
+    if snapshot is None:
+        return {"error": "unknown_application", "application_id": application_id}
+    stored = snapshot.get("verdict")
+    if isinstance(stored, dict):
+        return {"application_id": application_id, "verdict": stored}
+    shown = shown_snapshot(snapshot)
+    missing_answers = [name for name in ANSWER_FIELDS if shown["answers"].get(name) is None]
+    if missing_answers:
+        return {"error": "answers_incomplete", "application_id": application_id, "fields": missing_answers}
+    if parse_volume(str(shown["answers"].get("monthly_volume") or "")) is None:
+        return {"error": "volume_unreadable", "application_id": application_id}
+    open_slots = [
+        slot
+        for slot, file in shown["files"].items()
+        if file.get("state") == "pending" and not file.get("reason_code")
+    ]
+    if open_slots:
+        return {"error": "slots_open", "application_id": application_id, "slots": open_slots}
+    verdict = decide(shown["answers"], shown["files"])
+    if verdict["outcome"] != "REFUSED":
+        verdict["review_id"] = store.allocate_review_id()
+    snapshot["verdict"] = verdict
+    if not store.replace(application_id, snapshot):
+        return {"error": "unknown_application", "application_id": application_id}
+    return {"application_id": application_id, "verdict": verdict}

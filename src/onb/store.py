@@ -18,6 +18,7 @@ class ApplicationStore:
         self.database_url = database_url
         self._rows: dict[str, dict] = {}
         self._ready = False
+        self._next_review = 2041
 
     @classmethod
     def from_env(cls) -> ApplicationStore:
@@ -44,6 +45,17 @@ class ApplicationStore:
             return self._postgres_get(application_id)
         row = self._rows.get(application_id)
         return copy.deepcopy(row) if row is not None else None
+
+    def allocate_review_id(self) -> str:
+        if self.database_url:
+            self._ensure_table()
+            with self._connect() as conn:
+                conn.execute("CREATE SEQUENCE IF NOT EXISTS review_ids START 2041")
+                row = conn.execute("SELECT nextval('review_ids')").fetchone()
+            return f"MR-{int(row[0])}"
+        review_id = f"MR-{self._next_review}"
+        self._next_review += 1
+        return review_id
 
     def count(self) -> int:
         if self.database_url:
