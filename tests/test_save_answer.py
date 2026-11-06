@@ -45,6 +45,59 @@ def test_unknown_application_is_an_error() -> None:
     assert store.count() == 0
 
 
+def _until(store: ApplicationStore, application_id: str, field: str) -> None:
+    answers = {
+        "shop_name": "Lotus Tea House",
+        "city": "Pune",
+        "business_type": "Restaurant",
+        "monthly_volume": "₹12,00,000",
+        "payment_methods": "UPI and cards",
+    }
+    while ask(store, application_id)["pending"]["name"] != field:
+        pending = ask(store, application_id)["pending"]["name"]
+        save_answer(store, application_id, pending, answers[pending])
+
+
+def test_an_unreadable_volume_stays_pending() -> None:
+    store = ApplicationStore()
+    created = ask(store, None)
+    application_id = created["application_id"]
+    _until(store, application_id, "monthly_volume")
+
+    rejected = save_answer(store, application_id, "monthly_volume", "12 lakh")
+
+    assert rejected == {"error": "volume_unreadable", "field": "monthly_volume"}
+    assert ask(store, application_id)["pending"]["name"] == "monthly_volume"
+    assert ask(store, application_id)["snapshot"]["answers"]["monthly_volume"] is None
+
+
+def test_a_digit_volume_advances() -> None:
+    store = ApplicationStore()
+    created = ask(store, None)
+    application_id = created["application_id"]
+    _until(store, application_id, "monthly_volume")
+
+    saved = save_answer(store, application_id, "monthly_volume", "₹12,00,000")
+
+    assert saved["value"] == "₹12,00,000"
+    assert ask(store, application_id)["pending"]["name"] == "payment_methods"
+
+
+def test_phones_must_be_yes_or_no() -> None:
+    store = ApplicationStore()
+    created = ask(store, None)
+    application_id = created["application_id"]
+    _until(store, application_id, "stores_payer_phones")
+
+    rejected = save_answer(store, application_id, "stores_payer_phones", "we store them")
+
+    assert rejected == {"error": "phones_not_yes_or_no", "field": "stores_payer_phones"}
+    assert ask(store, application_id)["pending"]["name"] == "stores_payer_phones"
+    saved = save_answer(store, application_id, "stores_payer_phones", "No")
+    assert saved["value"] == "No"
+    assert ask(store, application_id)["pending"]["kind"] == "upload"
+
+
 def test_blank_answer_does_not_advance() -> None:
     store = ApplicationStore()
     created = ask(store, None)

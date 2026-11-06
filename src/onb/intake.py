@@ -33,6 +33,7 @@ PACK_SLOTS = (
 ADDENDUM = "dpa_addendum"
 
 _YES = {"yes", "y", "true"}
+_NO = {"no", "n", "false"}
 
 
 def empty_snapshot() -> dict:
@@ -95,6 +96,7 @@ def save_answer(store: ApplicationStore, application_id: str, field: str, value:
     """Store the merchant's words for the one field that is pending.
 
     The words are data. They do not choose a different field, skip one, or submit.
+    monthly_volume must be digits. stores_payer_phones must be yes or no.
     """
     snapshot = store.get(application_id)
     if snapshot is None:
@@ -105,6 +107,10 @@ def save_answer(store: ApplicationStore, application_id: str, field: str, value:
     text = value.strip()
     if field != "note" and text == "":
         return {"error": "empty_answer", "field": field}
+    if field == "monthly_volume" and parse_volume(text) is None:
+        return {"error": "volume_unreadable", "field": field}
+    if field == "stores_payer_phones" and text.lower() not in _YES | _NO:
+        return {"error": "phones_not_yes_or_no", "field": field}
     snapshot["answers"][field] = text
     if not store.replace(application_id, snapshot):
         return {"error": "unknown_application", "application_id": application_id}
