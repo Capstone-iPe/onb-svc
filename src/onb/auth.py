@@ -79,6 +79,82 @@ def redirect_allowed(uri: str) -> bool:
     return False
 
 
+class MemoryClients:
+    """The process remembers registrations until it stops."""
+
+    def __init__(self) -> None:
+        self._rows: dict[str, OAuthClientInformationFull] = {}
+
+    def get(self, client_id: str) -> OAuthClientInformationFull | None:
+        return self._rows.get(client_id)
+
+    def put(self, client: OAuthClientInformationFull) -> None:
+        self._rows[client.client_id] = client
+
+
+class PostgresClients:
+    """ChatGPT keeps the client id. A restart must still know it."""
+
+    def __init__(self, database_url: str) -> None:
+        self.database_url = database_url
+        self._ready = False
+
+    def get(self, client_id: str) -> OAuthClientInformationFull | None:
+        self._ensure()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT record FROM oauth_clients WHERE client_id = %s",
+                (client_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return OAuthClientInformationFull.model_validate(row[0])
+
+    def put(self, client: OAuthClientInformationFull) -> None:
+        from psycopg.types.json import Jsonb
+
+        self._ensure()
+        record = client.model_dump(mode="json")
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO oauth_clients (client_id, record)
+                VALUES (%s, %s)
+                ON CONFLICT (client_id) DO UPDATE SET record = EXCLUDED.record
+                """,
+                (client.client_id, Jsonb(record)),
+            )
+
+    def _connect(self):
+        import psycopg
+
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://") :]
+        return psycopg.connect(url, autocommit=True)
+
+    def _ensure(self) -> None:
+        if self._ready:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS oauth_clients (
+                    client_id text PRIMARY KEY,
+                    record jsonb NOT NULL
+                )
+                """
+            )
+        self._ready = True
+
+
+def client_directory() -> MemoryClients | PostgresClients:
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if url:
+        return PostgresClients(url)
+    return MemoryClients()
+
+
 @dataclass
 class _Pending:
     client_id: str
@@ -103,6 +179,7 @@ class GoogleAuthProvider(
         resource_url: str,
         allowed_emails: frozenset[str] = frozenset(),
         exchange_code=None,
+        clients=None,
     ) -> None:
         self.google_client_id = google_client_id
         self.google_client_secret = google_client_secret
@@ -111,7 +188,7 @@ class GoogleAuthProvider(
         self.allowed_emails = allowed_emails
         self._exchange_code = exchange_code or self.exchange_google_code
         self.google_redirect_uri = f"{self.public_url}/auth/google/callback"
-        self.clients: dict[str, OAuthClientInformationFull] = {}
+        self.clients = clients if clients is not None else MemoryClients()
         self.pending: dict[str, _Pending] = {}
         self.codes: dict[str, AuthorizationCode] = {}
         self.access_tokens: dict[str, AccessToken] = {}
@@ -126,7 +203,7 @@ class GoogleAuthProvider(
         if not uris:
             raise RegistrationError("invalid_redirect_uri", "Redirect URI is not allowed")
         client_info.redirect_uris = uris
-        self.clients[client_info.client_id] = client_info
+        self.clients.put(client_info)
 
     async def authorize(self, client: OAuthClientInformationFull, params: AuthorizationParams) -> str:
         if not redirect_allowed(str(params.redirect_uri)):
@@ -305,6 +382,7 @@ def build_mcp() -> tuple[MCPServer, bool]:
         public_url=public,
         resource_url=resource,
         allowed_emails=allowed_emails_from_env(),
+        clients=client_directory(),
     )
     server = MCPServer(
         "onb",

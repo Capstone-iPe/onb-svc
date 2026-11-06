@@ -71,6 +71,53 @@ def test_cursor_registration_keeps_its_callbacks_and_drops_a_foreign_one():
         )
 
 
+def test_a_registered_client_is_still_there_after_the_process_restarts() -> None:
+    remembered = _RememberedClients()
+    first = GoogleAuthProvider(
+        google_client_id="google-client",
+        google_client_secret="google-secret",
+        public_url="http://127.0.0.1:8000",
+        resource_url="http://127.0.0.1:8000/mcp",
+        clients=remembered,
+    )
+    client = OAuthClientInformationFull(
+        client_id="618bfd74-ab35-4b10-925e-4e9f84145d28",
+        redirect_uris=[AnyUrl("https://chatgpt.com/connector/oauth/cb_123")],
+        grant_types=["authorization_code", "refresh_token"],
+        token_endpoint_auth_method="none",
+        response_types=["code"],
+    )
+    asyncio.run(first.register_client(client))
+    second = GoogleAuthProvider(
+        google_client_id="google-client",
+        google_client_secret="google-secret",
+        public_url="http://127.0.0.1:8000",
+        resource_url="http://127.0.0.1:8000/mcp",
+        clients=remembered,
+    )
+
+    found = asyncio.run(second.get_client(client.client_id))
+
+    assert found is not None
+    assert str(found.redirect_uris[0]) == "https://chatgpt.com/connector/oauth/cb_123"
+
+
+class _RememberedClients:
+    """Stores the registration the way Postgres does: as data, not as the live object."""
+
+    def __init__(self) -> None:
+        self.raw: dict[str, dict] = {}
+
+    def put(self, client: OAuthClientInformationFull) -> None:
+        self.raw[client.client_id] = client.model_dump(mode="json")
+
+    def get(self, client_id: str) -> OAuthClientInformationFull | None:
+        record = self.raw.get(client_id)
+        if record is None:
+            return None
+        return OAuthClientInformationFull.model_validate(record)
+
+
 def test_mcp_without_a_bearer_is_401_and_health_stays_open():
     app, _provider = _app(lambda _code: "owner@gmail.com")
 
