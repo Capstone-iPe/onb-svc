@@ -1,8 +1,31 @@
 import asyncio
 
+import pytest
+from mcp.server.mcpserver.tools.tool_manager import ToolError
+
 from onb.server import mcp
 
 EXPECTED = {"next_step", "save_answer", "save_file", "submit", "get_review"}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "activate",
+        "waive",
+        "mark-complete",
+        "mark_complete",
+        "change-volume",
+        "change_volume",
+        "create_application",
+        "get_application",
+        "mark_missing",
+        "verify",
+    ],
+)
+def test_an_unlisted_tool_name_is_rejected(name: str) -> None:
+    with pytest.raises(ToolError, match="Unknown tool"):
+        asyncio.run(mcp.call_tool(name, {}))
 
 
 def test_advertises_the_five_tools() -> None:
