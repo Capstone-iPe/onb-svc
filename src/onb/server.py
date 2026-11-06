@@ -110,8 +110,9 @@ def save_file(
         str,
         Field(
             description=(
-                "The upload slot next_step said is pending. One of business_registration, "
-                "owner_id, bank_proof, shopfront_photo, dpa_addendum."
+                "The upload slot. Before submit, this is the slot next_step said is pending. "
+                "After submit, this is a slot still missing or rejected: business_registration, "
+                "owner_id, bank_proof, shopfront_photo, or dpa_addendum."
             )
         ),
     ],
@@ -136,9 +137,9 @@ def save_file(
 ) -> dict:
     """Store one upload, or close a slot the merchant does not have.
 
-    Call this only when next_step says an upload slot is pending. The file is a PDF, JPG, or PNG. A real file is checked by the document verifier. A rejected file, including a file in another format, leaves that same slot pending. The signed addendum is a file. A sentence in the note does not replace it.
+    Before submit, call this only when next_step says an upload slot is pending. The file is a PDF, JPG, or PNG. A real file is checked by the document verifier. A rejected file, including a file in another format, leaves that same slot pending. The signed addendum is a file. A sentence in the note does not replace it.
 
-    This tool does not activate the shop and does not submit by itself.
+    After submit, a file for a missing or rejected slot is stored and the rules run again. The review id stays the same. This tool does not activate the shop and does not submit by itself.
     """
     result = store_file(store, application_id, slot, file, missing)
     log_result("save_file", result)

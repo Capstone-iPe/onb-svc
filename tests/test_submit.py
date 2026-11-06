@@ -1,4 +1,4 @@
-from onb.intake import ask, save_answer, save_file, submit
+from onb.intake import ask, get_review, save_answer, save_file, submit
 from onb.store import ApplicationStore, MemoryApplicationStore
 
 
@@ -119,3 +119,50 @@ def test_a_slot_that_is_still_open_does_not_submit() -> None:
 def test_unknown_application_is_an_error() -> None:
     store = MemoryApplicationStore()
     assert submit(store, "app_missing") == {"error": "unknown_application", "application_id": "app_missing"}
+
+
+def test_a_file_after_the_verdict_updates_the_card_and_keeps_the_review_id() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Restaurant", "₹12,00,000", phones="No")
+    _close_pack(store, application_id, {"shopfront_photo"})
+    save_answer(store, application_id, "note", "")
+
+    first = submit(store, application_id)
+    saved = save_file(store, application_id, "shopfront_photo", file="front.jpg")
+    again = submit(store, application_id)
+    stored = get_review(store, application_id)
+
+    assert first["verdict"]["outcome"] == "IN_REVIEW"
+    assert first["verdict"]["missing_items"] == ["shopfront_photo"]
+    assert first["verdict"]["review_id"] == "MR-2041"
+    assert saved["state"] == "accepted"
+    assert saved["verdict"]["outcome"] == "RECOMMEND_GO_LIVE"
+    assert saved["verdict"]["missing_items"] == []
+    assert saved["verdict"]["review_id"] == "MR-2041"
+    assert again["verdict"]["review_id"] == "MR-2041"
+    assert stored["verdict"]["outcome"] == "RECOMMEND_GO_LIVE"
+
+
+def test_a_later_file_does_not_cure_a_refused_type() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Hawala desk", "₹12,00,000", phones="No")
+    _close_pack(store, application_id, {"shopfront_photo"})
+    save_answer(store, application_id, "note", "")
+    submit(store, application_id)
+
+    saved = save_file(store, application_id, "shopfront_photo", file="front.jpg")
+
+    assert saved["verdict"]["outcome"] == "REFUSED"
+    assert saved["verdict"]["review_id"] is None
+
+
+def test_an_accepted_slot_stays_closed_after_the_verdict() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Restaurant", "₹12,00,000", phones="No")
+    _close_pack(store, application_id, {"shopfront_photo"})
+    save_answer(store, application_id, "note", "")
+    submit(store, application_id)
+
+    saved = save_file(store, application_id, "business_registration", file="registration.pdf")
+
+    assert saved["error"] == "slot_not_pending"

@@ -20,7 +20,7 @@ Leave these off the server: activate, waive, mark-complete, change-volume, creat
 
 - `next_step` with no id creates one application and returns `app_` plus twelve hex characters. The same id does not create another. An unknown id is an error and does not create a row. A blank id creates.
 - `save_answer` writes only the pending text field.
-- `save_file` writes only the pending upload. `missing=true` closes that slot as `missing`. A file and `missing=true` together is `file_and_missing`.
+- `save_file` writes the pending upload before submit. `missing=true` closes that slot as `missing`. A file and `missing=true` together is `file_and_missing`. After the verdict, a file for a slot that is missing or still pending is stored, the rules run again, and the review id stays the same.
 - `submit` runs the rules once and allocates `MR-2041` onward, unless the outcome is `REFUSED`. A second submit returns the stored verdict and the same id.
 - `get_review` returns the stored verdict. It does not call `decide` and it does not allocate an id. Before submit the error is `no_review`.
 

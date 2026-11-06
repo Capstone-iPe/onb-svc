@@ -133,27 +133,42 @@ def save_file(
 ) -> dict:
     """Store one upload, or close a slot the merchant does not have.
 
-    The verifier decides accepted. This function does not.
+    Before submit, only the pending upload can be written. After the verdict, a file for a slot that is missing or still pending is stored, the rules run again, and the review id stays the same. The verifier decides accepted. This function does not.
     """
     snapshot = store.get(application_id)
     if snapshot is None:
         return {"error": "unknown_application", "application_id": application_id}
+    shown = shown_snapshot(snapshot)
     pending = pending_item(snapshot)
-    if pending is None or pending.get("kind") != "upload" or pending.get("name") != slot:
+    on_pending = (
+        pending is not None and pending.get("kind") == "upload" and pending.get("name") == slot
+    )
+    slot_file = shown["files"].get(slot)
+    filling_gap = (
+        isinstance(snapshot.get("verdict"), dict)
+        and isinstance(slot_file, dict)
+        and slot_file.get("state") != "accepted"
+        and not missing
+    )
+    if not on_pending and not filling_gap:
         return {"error": "slot_not_pending", "slot": slot, "pending": pending}
     payload = file_bytes(file)
     if missing and payload:
         return {"error": "file_and_missing", "slot": slot}
     if missing:
         snapshot["files"][slot] = {"state": "missing"}
+        _refresh_verdict(snapshot)
         if not store.replace(application_id, snapshot):
             return {"error": "unknown_application", "application_id": application_id}
-        return {
+        saved = {
             "application_id": application_id,
             "slot": slot,
             "state": "missing",
             "snapshot": shown_snapshot(snapshot),
         }
+        if isinstance(snapshot.get("verdict"), dict):
+            saved["verdict"] = snapshot["verdict"]
+        return saved
     if not payload:
         return {"error": "file_missing", "slot": slot}
     checker = verifier or MockDocumentVerifier()
@@ -165,15 +180,33 @@ def save_file(
         "state": "accepted" if accepted else "pending",
         "reason_code": reason_code,
     }
+    _refresh_verdict(snapshot)
     if not store.replace(application_id, snapshot):
         return {"error": "unknown_application", "application_id": application_id}
-    return {
+    saved = {
         "application_id": application_id,
         "slot": slot,
         "state": snapshot["files"][slot]["state"],
         "reason_code": reason_code,
         "snapshot": shown_snapshot(snapshot),
     }
+    if isinstance(snapshot.get("verdict"), dict):
+        saved["verdict"] = snapshot["verdict"]
+    return saved
+
+
+def _refresh_verdict(snapshot: dict) -> None:
+    """Run the rules again after a file lands on an application that already has a verdict.
+
+    The review id already allocated stays. A refused application still has none.
+    """
+    stored = snapshot.get("verdict")
+    if not isinstance(stored, dict):
+        return
+    shown = shown_snapshot(snapshot)
+    verdict = decide(shown["answers"], shown["files"])
+    verdict["review_id"] = stored.get("review_id")
+    snapshot["verdict"] = verdict
 
 
 def submit(store: ApplicationStore, application_id: str) -> dict:
