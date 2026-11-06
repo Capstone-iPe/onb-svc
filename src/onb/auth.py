@@ -44,6 +44,8 @@ GOOGLE_TOKENINFO = "https://oauth2.googleapis.com/tokeninfo"
 
 _CLAUDE_REDIRECT = "https://claude.ai/api/mcp/auth_callback"
 _CHATGPT_REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect"
+_CURSOR_WEB = "https://www.cursor.com/agents/mcp/oauth/callback"
+_CURSOR_APP = "cursor://anysphere.cursor-mcp/oauth/callback"
 
 
 def public_base_url() -> str:
@@ -61,12 +63,12 @@ def allowed_emails_from_env() -> frozenset[str]:
 
 
 def redirect_allowed(uri: str) -> bool:
-    """Claude's callback, ChatGPT's callbacks, and a loopback port for Claude Code."""
+    """Claude, ChatGPT, and Cursor callbacks, plus a loopback port for a desktop app."""
     parsed = urlparse(uri)
     if parsed.username or parsed.password or parsed.fragment or parsed.query:
         return False
-    if parsed.scheme == "https" and parsed.hostname == "claude.ai":
-        return uri == _CLAUDE_REDIRECT
+    if uri in (_CLAUDE_REDIRECT, _CURSOR_WEB, _CURSOR_APP):
+        return True
     if parsed.scheme == "https" and parsed.hostname == "chatgpt.com":
         if uri == _CHATGPT_REDIRECT:
             return True
@@ -120,12 +122,10 @@ class GoogleAuthProvider(
         return self.clients.get(client_id)
 
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
-        uris = client_info.redirect_uris or []
+        uris = [uri for uri in (client_info.redirect_uris or []) if redirect_allowed(str(uri))]
         if not uris:
-            raise RegistrationError("invalid_redirect_uri", "A redirect URI is required")
-        for uri in uris:
-            if not redirect_allowed(str(uri)):
-                raise RegistrationError("invalid_redirect_uri", "Redirect URI is not allowed")
+            raise RegistrationError("invalid_redirect_uri", "Redirect URI is not allowed")
+        client_info.redirect_uris = uris
         self.clients[client_info.client_id] = client_info
 
     async def authorize(self, client: OAuthClientInformationFull, params: AuthorizationParams) -> str:

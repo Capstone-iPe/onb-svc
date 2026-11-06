@@ -4,8 +4,12 @@ import hashlib
 import json
 from urllib.parse import parse_qs, urlencode, urlparse
 
+import pytest
+from mcp.server.auth.provider import RegistrationError
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.mcpserver import MCPServer
+from mcp.shared.auth import OAuthClientInformationFull
+from pydantic import AnyUrl
 from starlette.responses import JSONResponse
 
 from onb.auth import GoogleAuthProvider, SignInChallenge, protected_resource_document, redirect_allowed
@@ -15,12 +19,56 @@ def test_redirect_allow_list():
     assert redirect_allowed("https://claude.ai/api/mcp/auth_callback")
     assert redirect_allowed("https://chatgpt.com/connector_platform_oauth_redirect")
     assert redirect_allowed("https://chatgpt.com/connector/oauth/cb_123")
+    assert redirect_allowed("https://www.cursor.com/agents/mcp/oauth/callback")
+    assert redirect_allowed("cursor://anysphere.cursor-mcp/oauth/callback")
+    assert redirect_allowed("http://localhost:8787/callback")
     assert redirect_allowed("http://127.0.0.1:54321/callback")
     assert redirect_allowed("http://localhost:9/callback")
     assert not redirect_allowed("https://evil.example/callback")
     assert not redirect_allowed("https://claude.ai/api/mcp/auth_callback?next=https://evil.example")
     assert not redirect_allowed("https://chatgpt.com/connector/oauth/cb_123/extra")
     assert not redirect_allowed("https://127.0.0.1/callback")
+
+
+def test_cursor_registration_keeps_its_callbacks_and_drops_a_foreign_one():
+    provider = GoogleAuthProvider(
+        google_client_id="google-client",
+        google_client_secret="google-secret",
+        public_url="http://127.0.0.1:8000",
+        resource_url="http://127.0.0.1:8000/mcp",
+    )
+    client = OAuthClientInformationFull(
+        client_id="cursor",
+        redirect_uris=[
+            AnyUrl("cursor://anysphere.cursor-mcp/oauth/callback"),
+            AnyUrl("https://www.cursor.com/agents/mcp/oauth/callback"),
+            AnyUrl("http://localhost:8787/callback"),
+            AnyUrl("https://evil.example/callback"),
+        ],
+        grant_types=["authorization_code", "refresh_token"],
+        token_endpoint_auth_method="none",
+        response_types=["code"],
+    )
+
+    asyncio.run(provider.register_client(client))
+
+    assert [str(uri).rstrip("/") for uri in client.redirect_uris or []] == [
+        "cursor://anysphere.cursor-mcp/oauth/callback",
+        "https://www.cursor.com/agents/mcp/oauth/callback",
+        "http://localhost:8787/callback",
+    ]
+    with pytest.raises(RegistrationError):
+        asyncio.run(
+            provider.register_client(
+                OAuthClientInformationFull(
+                    client_id="stranger",
+                    redirect_uris=[AnyUrl("https://evil.example/callback")],
+                    grant_types=["authorization_code", "refresh_token"],
+                    token_endpoint_auth_method="none",
+                    response_types=["code"],
+                )
+            )
+        )
 
 
 def test_mcp_without_a_bearer_is_401_and_health_stays_open():
