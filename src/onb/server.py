@@ -1,4 +1,4 @@
-"""MCP server for ONB. next_step, save_answer, save_file, and submit are live. get_review is not written yet.
+"""MCP server for ONB. next_step, save_answer, save_file, submit, and get_review are live.
 
 When GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set, /mcp requires a bearer token. /health stays open.
 """
@@ -15,6 +15,7 @@ from starlette.responses import JSONResponse
 from onb.auth import SignInChallenge
 from onb.auth import build_mcp
 from onb.intake import ask
+from onb.intake import get_review as read_review
 from onb.intake import save_answer as store_answer
 from onb.intake import save_file as store_file
 from onb.intake import submit as run_submit
@@ -30,10 +31,6 @@ store = ApplicationStore.from_env()
 @mcp.custom_route("/health", methods=["GET"])
 async def health(_request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok"})
-
-
-def _later(name: str) -> dict:
-    return {"error": "not_implemented", "tool": name}
 
 
 @mcp.tool()
@@ -168,7 +165,7 @@ def get_review(
 
     This tool does not create a review, change the verdict, or activate the shop.
     """
-    result = _later("get_review")
+    result = read_review(store, application_id)
     log_result("get_review", result)
     return result
 

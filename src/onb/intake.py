@@ -198,3 +198,17 @@ def submit(store: ApplicationStore, application_id: str) -> dict:
     if not store.replace(application_id, snapshot):
         return {"error": "unknown_application", "application_id": application_id}
     return {"application_id": application_id, "verdict": verdict}
+
+
+def get_review(store: ApplicationStore, application_id: str) -> dict:
+    """Return the verdict submit already stored.
+
+    This does not run the rules, allocate a review id, or change the application.
+    """
+    snapshot = store.get(application_id)
+    if snapshot is None:
+        return {"error": "unknown_application", "application_id": application_id}
+    stored = snapshot.get("verdict")
+    if not isinstance(stored, dict):
+        return {"error": "no_review", "application_id": application_id}
+    return {"application_id": application_id, "verdict": stored}

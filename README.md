@@ -2,7 +2,7 @@
 
 The onboarding rules service for the iPe Merchant Onboarding Copilot. One Python process. No model. The copilot calls it over MCP. This process owns the application, the files, and the verdict.
 
-The five tools are registered. `next_step` creates the application and returns the pending item plus the snapshot. `save_answer` stores the merchant's words for that one field. `save_file` stores one upload, or closes a slot the merchant does not have. The document verifier in this process is a mock. `submit` runs the rules and allocates one review id, unless the type is refused. `get_review` does not decide anything yet.
+The five tools are registered. `next_step` creates the application and returns the pending item plus the snapshot. `save_answer` stores the merchant's words for that one field. `save_file` stores one upload, or closes a slot the merchant does not have. The document verifier in this process is a mock. `submit` runs the rules and allocates one review id, unless the type is refused. `get_review` returns that stored verdict. It does not run the rules and it does not allocate an id.
 
 ## Layout
 
