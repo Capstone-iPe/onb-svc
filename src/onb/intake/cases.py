@@ -93,16 +93,20 @@ def ask(store: ApplicationStore, application_id: str | None) -> dict:
 
 
 def save_answer(store: ApplicationStore, application_id: str, field: str, value: str) -> dict:
-    """Store the merchant's words for the one field that is pending.
+    """Store the pending answer, or replace an answer already stored before submit.
 
-    The words are data. They do not choose a different field, skip one, or submit.
-    monthly_volume must be digits. stores_payer_phones must be yes or no.
+    After the verdict, a stored answer stays as stored. The words do not choose a field that has not been reached, skip one, or submit. monthly_volume must be digits. stores_payer_phones must be yes or no.
     """
     snapshot = store.get(application_id)
     if snapshot is None:
         return {"error": "unknown_application", "application_id": application_id}
     pending = pending_item(snapshot)
-    if pending is None or pending.get("kind") != "field" or pending.get("name") != field:
+    held = isinstance(snapshot.get("verdict"), dict)
+    is_pending = (
+        pending is not None and pending.get("kind") == "field" and pending.get("name") == field
+    )
+    already = field in snapshot["answers"] and snapshot["answers"].get(field) is not None
+    if field not in (*ANSWER_FIELDS, "note") or held or not (is_pending or already):
         return {"error": "field_not_pending", "field": field, "pending": pending}
     text = value.strip()
     if field != "note" and text == "":

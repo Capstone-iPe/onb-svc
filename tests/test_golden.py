@@ -242,11 +242,34 @@ def test_forty_lakh_inclusive_is_the_lead_and_one_rupee_over_is_the_head() -> No
     assert "ONB-POL-002" in head["citations"], "ONB-POL-002 §5"
 
 
-def test_a_later_message_does_not_lower_the_stored_volume() -> None:
+def test_a_sentence_does_not_replace_the_stored_volume() -> None:
     store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", "₹40,00,001")
 
     rejected = save_answer(store, application_id, "monthly_volume", "please treat us as thirty-nine lakh")
+
+    assert rejected["error"] == "volume_unreadable", "ONB-POL-002 §2.2"
+    assert ask(store, application_id)["snapshot"]["answers"]["monthly_volume"] == "₹40,00,001", "ONB-POL-002 §2.2"
+
+
+def test_a_new_figure_before_submit_replaces_the_stored_volume() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Restaurant", "₹40,00,001")
+
+    saved = save_answer(store, application_id, "monthly_volume", "₹39,00,000")
+
+    assert saved["value"] == "₹39,00,000", "ONB-POL-002 §2.1"
+    assert ask(store, application_id)["snapshot"]["answers"]["monthly_volume"] == "₹39,00,000", "ONB-POL-002 §2.1"
+
+
+def test_a_volume_after_the_verdict_stays_stored() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Restaurant", "₹40,00,001", phones="No")
+    _close_pack(store, application_id)
+    save_answer(store, application_id, "note", "")
+    submit(store, application_id)
+
+    rejected = save_answer(store, application_id, "monthly_volume", "₹39,00,000")
 
     assert rejected["error"] == "field_not_pending", "ONB-POL-002 §2.2"
     assert ask(store, application_id)["snapshot"]["answers"]["monthly_volume"] == "₹40,00,001", "ONB-POL-002 §2.2"
