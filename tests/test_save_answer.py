@@ -64,11 +64,23 @@ def test_an_unreadable_volume_stays_pending() -> None:
     application_id = created["application_id"]
     _until(store, application_id, "monthly_volume")
 
-    rejected = save_answer(store, application_id, "monthly_volume", "12 lakh")
+    rejected = save_answer(store, application_id, "monthly_volume", "about twelve")
 
     assert rejected == {"error": "volume_unreadable", "field": "monthly_volume"}
     assert ask(store, application_id)["pending"]["name"] == "monthly_volume"
     assert ask(store, application_id)["snapshot"]["answers"]["monthly_volume"] is None
+
+
+def test_lakh_and_crore_are_the_rupee_figure() -> None:
+    store = MemoryApplicationStore()
+    created = ask(store, None)
+    application_id = created["application_id"]
+    _until(store, application_id, "monthly_volume")
+
+    saved = save_answer(store, application_id, "monthly_volume", "Rs. 12 lakh")
+
+    assert saved["value"] == "Rs. 12 lakh"
+    assert ask(store, application_id)["pending"]["name"] == "payment_methods"
 
 
 def test_a_digit_volume_advances() -> None:
@@ -93,8 +105,9 @@ def test_phones_must_be_yes_or_no() -> None:
 
     assert rejected == {"error": "phones_not_yes_or_no", "field": "stores_payer_phones"}
     assert ask(store, application_id)["pending"]["name"] == "stores_payer_phones"
-    saved = save_answer(store, application_id, "stores_payer_phones", "No")
-    assert saved["value"] == "No"
+    saved = save_answer(store, application_id, "stores_payer_phones", "No, we don't store them.")
+    assert saved["value"] == "No, we don't store them."
+    assert "dpa_addendum" not in saved["snapshot"]["files"]
     assert ask(store, application_id)["pending"]["kind"] == "upload"
 
 

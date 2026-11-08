@@ -49,7 +49,7 @@ def next_step(
 
     Call this at the start of the chat, and again after every saved answer or file, to learn the one pending field or upload. The result includes the application id, the pending item, and the snapshot of answers and file slots already stored.
 
-    shop_name, city, business_type, payment_methods, and note are the merchant's words. When monthly_volume is pending, ask for a rupee amount in digits, such as ₹12,00,000. When stores_payer_phones is pending, ask for yes or no. An upload is a PDF, JPG, or PNG.
+    shop_name, city, business_type, payment_methods, and note are the merchant's words. When monthly_volume is pending, ask for a rupee amount in digits, such as ₹12,00,000, or a number of lakh or crore, such as Rs. 12 lakh. When stores_payer_phones is pending, ask for yes or no. A longer answer counts when it starts with yes or no. An upload is a PDF, JPG, or PNG.
 
     A why-question does not save anything. Call this again and ask the same pending field.
 
@@ -82,17 +82,18 @@ def save_answer(
             description=(
                 "The merchant's answer for the pending field. shop_name, city, "
                 "business_type, payment_methods, and note are their words. "
-                "monthly_volume is a rupee amount in digits, such as ₹12,00,000. "
-                "stores_payer_phones is yes or no."
+                "monthly_volume is a rupee amount in digits, such as ₹12,00,000, "
+                "or a number of lakh or crore, such as Rs. 12 lakh. "
+                "stores_payer_phones is yes or no. A longer answer counts when it starts with yes or no."
             )
         ),
     ],
 ) -> dict:
     """Store the pending answer, or replace an answer already stored before submit.
 
-    Before submit, call this for the field next_step says is pending, or again for a field that already has a value. monthly_volume must be digits, such as ₹12,00,000. A sentence that is not digits does not replace the stored volume. After the verdict, a stored answer stays as stored.
+    Before submit, call this for the field next_step says is pending, or again for a field that already has a value. monthly_volume is digits, such as ₹12,00,000, or a number of lakh or crore, such as Rs. 12 lakh. A sentence that is not that figure does not replace the stored volume. After the verdict, a stored answer stays as stored.
 
-    shop_name, city, business_type, payment_methods, and note are free text. The note may be empty. stores_payer_phones is yes or no. This tool does not upload a file and does not submit.
+    shop_name, city, business_type, payment_methods, and note are free text. The note may be empty. stores_payer_phones is yes or no, including a longer answer that starts with yes or no. This tool does not upload a file and does not submit.
     """
     result = store_answer(store, application_id, field, value)
     log_result("save_answer", result)

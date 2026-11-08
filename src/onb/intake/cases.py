@@ -6,8 +6,7 @@ import copy
 from datetime import date
 from typing import TYPE_CHECKING
 
-from onb.rules import parse_volume
-from onb.rules import decide
+from onb.rules import decide, parse_volume, phone_stored
 from onb.verifier import MockDocumentVerifier, file_bytes
 
 if TYPE_CHECKING:
@@ -32,10 +31,6 @@ PACK_SLOTS = (
 
 ADDENDUM = "dpa_addendum"
 
-_YES = {"yes", "y", "true"}
-_NO = {"no", "n", "false"}
-
-
 def empty_snapshot() -> dict:
     return {
         "answers": {name: None for name in (*ANSWER_FIELDS, "note")},
@@ -44,11 +39,7 @@ def empty_snapshot() -> dict:
 
 
 def stores_phones(value: object) -> bool:
-    if value is True:
-        return True
-    if isinstance(value, str):
-        return value.strip().lower() in _YES
-    return False
+    return phone_stored(value) is True
 
 
 def shown_snapshot(snapshot: dict) -> dict:
@@ -95,7 +86,7 @@ def ask(store: ApplicationStore, application_id: str | None) -> dict:
 def save_answer(store: ApplicationStore, application_id: str, field: str, value: str) -> dict:
     """Store the pending answer, or replace an answer already stored before submit.
 
-    After the verdict, a stored answer stays as stored. The words do not choose a field that has not been reached, skip one, or submit. monthly_volume must be digits. stores_payer_phones must be yes or no.
+    After the verdict, a stored answer stays as stored. The words do not choose a field that has not been reached, skip one, or submit. monthly_volume is digits or a number of lakh or crore. stores_payer_phones starts with yes or no.
     """
     snapshot = store.get(application_id)
     if snapshot is None:
@@ -113,7 +104,7 @@ def save_answer(store: ApplicationStore, application_id: str, field: str, value:
         return {"error": "empty_answer", "field": field}
     if field == "monthly_volume" and parse_volume(text) is None:
         return {"error": "volume_unreadable", "field": field}
-    if field == "stores_payer_phones" and text.lower() not in _YES | _NO:
+    if field == "stores_payer_phones" and phone_stored(text) is None:
         return {"error": "phones_not_yes_or_no", "field": field}
     snapshot["answers"][field] = text
     if not store.replace(application_id, snapshot):

@@ -33,11 +33,50 @@ _PERMITTED = {
 }
 
 
+_LAKH = 100_000
+_CRORE = 10_000_000
+_VOLUME_UNIT = re.compile(r"^(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores)$")
+_YES = {"yes", "y", "true"}
+_NO = {"no", "n", "false"}
+
+
 def parse_volume(value: str) -> int | None:
+    """The rupee figure, or None when the words are not that figure.
+
+    Digits, or a number of lakh or crore. A sentence around the figure is not a figure.
+    """
     text = value.strip().lower().replace("₹", "").replace(",", "")
-    text = text.replace("rs.", "").replace("rs", "").strip()
+    text = re.sub(r"\brs\.?|\binr\b", "", text)
+    text = " ".join(text.split())
     if text.isdigit():
         return int(text)
+    match = _VOLUME_UNIT.fullmatch(text)
+    if match is None:
+        return None
+    amount = float(match.group(1))
+    unit = _LAKH if match.group(2).startswith("lakh") else _CRORE
+    figure = amount * unit
+    if figure != int(figure):
+        return None
+    return int(figure)
+
+
+def phone_stored(value: object) -> bool | None:
+    """True or False when the answer starts with yes or no. None otherwise."""
+    if value is True:
+        return True
+    if value is False:
+        return False
+    if not isinstance(value, str):
+        return None
+    word = re.match(r"[a-z]+", value.strip().lower())
+    if word is None:
+        return None
+    token = word.group(0)
+    if token in _YES:
+        return True
+    if token in _NO:
+        return False
     return None
 
 
@@ -68,7 +107,7 @@ def decide(answers: dict, files: dict) -> dict:
         for slot, file in files.items()
         if file.get("state") != "accepted"
     ]
-    phones = str(answers.get("stores_payer_phones") or "").strip().lower() in {"yes", "y", "true"}
+    phones = phone_stored(answers.get("stores_payer_phones")) is True
     addendum_required = phones
     flagged = injection_flagged(answers.get("note"))
     above = volume is not None and volume > CEILING_INR

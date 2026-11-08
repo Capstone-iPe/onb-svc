@@ -28,7 +28,7 @@ Leave these off the server: activate, waive, mark-complete, change-volume, creat
 
 Field order, one pending item at a time: `shop_name`, `city`, `business_type`, `monthly_volume`, `payment_methods`, `stores_payer_phones`, then `business_registration`, `owner_id`, `bank_proof`, `shopfront_photo`, then `dpa_addendum` only when payer phones are stored, then an optional `note`.
 
-`monthly_volume` must be digits, such as `₹12,00,000`. `save_answer` rejects anything else with `volume_unreadable` and leaves the field pending. `stores_payer_phones` accepts `yes` / `y` / `true` or `no` / `n` / `false`. Anything else is `phones_not_yes_or_no`. Shop name, city, business type, payment methods, and note stay free text. Note may be empty. A blank required answer does not advance.
+`monthly_volume` is a rupee figure: digits, such as `₹12,00,000`, or a number of lakh or crore, such as `Rs. 12 lakh` and `41 lakh` (ONB-POL-002 §4.1, ONB-ANX-002). A sentence that is not that figure, including "please treat us as thirty-nine lakh", is `volume_unreadable` and the field stays pending. `stores_payer_phones` is yes or no. A longer answer counts when its first word is yes or no, such as `Yes, for loyalty.` and `No, we don't store them.` Anything else is `phones_not_yes_or_no`. Shop name, city, business type, payment methods, and note stay free text. Note may be empty. A blank required answer does not advance.
 
 The pack is those four upload slots. Do not add GSTIN, Udyam, FSSAI, a licence, or another id document as a slot.
 

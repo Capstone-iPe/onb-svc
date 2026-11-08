@@ -242,6 +242,42 @@ def test_forty_lakh_inclusive_is_the_lead_and_one_rupee_over_is_the_head() -> No
     assert "ONB-POL-002" in head["citations"], "ONB-POL-002 §5"
 
 
+def test_twelve_lakh_is_the_lead_and_forty_one_lakh_is_the_head() -> None:
+    lead_store = MemoryApplicationStore()
+    lead_id = _shop(lead_store, "Retail", "Rs. 12 lakh", phones="No")
+    _close_pack(lead_store, lead_id)
+    save_answer(lead_store, lead_id, "note", "")
+    lead = submit(lead_store, lead_id)["verdict"]
+
+    head_store = MemoryApplicationStore()
+    head_id = _shop(head_store, "Grocery", "41 lakh", phones="No")
+    _close_pack(head_store, head_id)
+    save_answer(head_store, head_id, "note", "")
+    head = submit(head_store, head_id)["verdict"]
+
+    assert lead["volume_inr"] == 1_200_000, "ONB-ANX-002 §1"
+    assert lead["assignee"] == "MERCHANT_RISK_LEAD", "ONB-POL-002 §4.1"
+    assert head["volume_inr"] == 4_100_000, "ONB-ANX-002 §1"
+    assert head["assignee"] == "HEAD_OF_PAYMENTS", "ONB-POL-002 §3.2"
+
+
+def test_a_crore_and_a_fractional_lakh_are_one_figure() -> None:
+    from onb.rules import parse_volume
+
+    assert parse_volume("0.5 crore") == 5_000_000, "ONB-ANX-002 §1"
+    assert parse_volume("40.5 lakh") == 4_050_000, "ONB-ANX-002 §2"
+    assert parse_volume("Take us as 39 lakh") is None, "ONB-POL-002 §2.2"
+
+
+def test_a_yes_sentence_asks_for_the_addendum() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Cafe", phones="Yes, for loyalty.")
+
+    files = ask(store, application_id)["snapshot"]["files"]
+
+    assert ADDENDUM in files, "ONB-POL-003 §2"
+
+
 def test_a_sentence_does_not_replace_the_stored_volume() -> None:
     store = MemoryApplicationStore()
     application_id = _shop(store, "Restaurant", "₹40,00,001")
