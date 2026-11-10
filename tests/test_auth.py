@@ -12,7 +12,14 @@ from mcp.shared.auth import OAuthClientInformationFull
 from pydantic import AnyUrl
 from starlette.responses import JSONResponse
 
-from onb.auth import GoogleAuthProvider, SignInChallenge, protected_resource_document, redirect_allowed
+from onb.auth import (
+    GoogleAuthProvider,
+    GoogleIdentity,
+    GoogleSignIn,
+    SignInChallenge,
+    protected_resource_document,
+    redirect_allowed,
+)
 from onb.clients import ClientDirectory
 
 
@@ -150,7 +157,13 @@ def test_mcp_without_a_bearer_is_401_and_health_stays_open():
 
 
 def test_google_callback_issues_a_token_and_a_bad_verifier_does_not():
-    app, provider = _app(lambda _code: "owner@gmail.com")
+    signed_in = GoogleSignIn(
+        email="owner@gmail.com",
+        access_token="google-access-token",
+        refresh_token="google-refresh-token",
+        expires_in=3600,
+    )
+    app, provider = _app(lambda _code: signed_in)
     verifier = "a" * 43
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
 
@@ -208,6 +221,7 @@ def test_google_callback_issues_a_token_and_a_bad_verifier_does_not():
     assert started[0] == 302
     assert google.netloc == "accounts.google.com"
     assert query["redirect_uri"] == ["http://127.0.0.1:8000/auth/google/callback"]
+    assert query["access_type"] == ["offline"]
     assert callback[0] == 302
     assert urlparse(callback[1]["location"]).netloc == "claude.ai"
     assert returned["state"] == ["abc"]
@@ -215,11 +229,36 @@ def test_google_callback_issues_a_token_and_a_bad_verifier_does_not():
     assert rejected[0] == 400
     assert accepted[0] == 200
     token = json.loads(accepted[2])["access_token"]
+    assert token == "google-access-token"
     loaded = asyncio.run(provider.load_access_token(token))
     assert loaded is not None
     assert loaded.subject == "owner@gmail.com"
     assert loaded.resource == "http://127.0.0.1:8000/mcp"
     assert b"owner@gmail.com" not in accepted[2]
+
+
+def test_a_google_bearer_from_another_allowed_client_is_accepted():
+    app, provider = _app(
+        lambda _code: GoogleSignIn(email="owner@gmail.com", access_token="unused"),
+        audiences=frozenset({"google-client", "web-app-client"}),
+        identities={
+            "web-app-access": GoogleIdentity(
+                email="owner@gmail.com",
+                subject="sub-1",
+                audience="web-app-client",
+                expires_in=3600,
+            )
+        },
+    )
+
+    loaded = asyncio.run(provider.load_access_token("web-app-access"))
+    rejected = asyncio.run(provider.load_access_token("nope"))
+
+    assert loaded is not None
+    assert loaded.subject == "owner@gmail.com"
+    assert loaded.client_id == "web-app-client"
+    assert rejected is None
+    assert app is not None
 
 
 def test_a_foreign_redirect_and_a_foreign_account_are_refused():
@@ -274,14 +313,31 @@ def test_a_foreign_redirect_and_a_foreign_account_are_refused():
     assert b"other@gmail.com" not in rejected[2]
 
 
-def _app(exchange, allowed=frozenset()):
+def _app(exchange, allowed=frozenset(), audiences=None, identities=None):
+    known = identities or {}
+
+    def inspect(token: str):
+        found = known.get(token)
+        if found is not None:
+            return found
+        if token == "google-access-token":
+            return GoogleIdentity(
+                email="owner@gmail.com",
+                subject="sub-owner",
+                audience="google-client",
+                expires_in=3600,
+            )
+        return None
+
     provider = GoogleAuthProvider(
         google_client_id="google-client",
         google_client_secret="google-secret",
         public_url="http://127.0.0.1:8000",
         resource_url="http://127.0.0.1:8000/mcp",
         allowed_emails=allowed,
+        allowed_audiences=audiences or frozenset({"google-client"}),
         exchange_code=exchange,
+        inspect_token=inspect,
     )
     server = MCPServer(
         "onb",

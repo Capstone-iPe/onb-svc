@@ -25,6 +25,17 @@ def allowed_emails_from_env() -> frozenset[str]:
     return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
 
 
+def allowed_audiences_from_env(primary: str) -> frozenset[str]:
+    """Client ids Google may put on an access token this process accepts.
+
+    GOOGLE_CLIENT_ID is always included. GOOGLE_ALLOWED_AUDIENCES may add more,
+    for example the web app's client id when it is not the same as this process.
+    """
+    from onb.auth.google_token import audiences_from_env
+
+    return audiences_from_env(primary, os.environ.get("GOOGLE_ALLOWED_AUDIENCES", ""))
+
+
 def redirect_allowed(uri: str) -> bool:
     """Claude, ChatGPT, and Cursor callbacks, plus a loopback port for a desktop app."""
     parsed = urlparse(uri)

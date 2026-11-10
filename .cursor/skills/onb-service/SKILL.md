@@ -79,7 +79,7 @@ Each protocol method has a docstring that states what the caller can rely on: ar
 
 The Google client id and secret stay in the environment. Do not print them, log them, or commit them. Do not add a redirect URI that is not already in `auth/redirects.py`.
 
-One application is one jsonb snapshot row. Do not add verdict columns unless the user asks. Client registrations persist in Postgres. Access tokens and in-progress sign-in state are still memory and drop on restart.
+One application is one jsonb snapshot row. Do not add verdict columns unless the user asks. Client registrations persist in Postgres. The MCP bearer is Google's access token. Every `/mcp` call asks Google whether that token is still valid. In-progress sign-in state and refresh handles are still memory and drop on restart. A Google access token that Google still accepts remains valid after a restart.
 
 Log the tool, application id, error, field, slot, state, reason code, pending name, and verdict outcome. Do not log the answer, the file bytes, a token, or account or id digits.
 

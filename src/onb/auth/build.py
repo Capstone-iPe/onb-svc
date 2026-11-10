@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from onb.auth.google_auth_provider import GoogleAuthProvider
-from onb.auth.redirects import allowed_emails_from_env, public_base_url
+from onb.auth.redirects import allowed_audiences_from_env, allowed_emails_from_env, public_base_url
 from onb.auth.sign_in_challenge import protected_resource_document
 from onb.clients import client_directory
 
@@ -28,6 +28,7 @@ def build_mcp() -> tuple[MCPServer, bool]:
         public_url=public,
         resource_url=resource,
         allowed_emails=allowed_emails_from_env(),
+        allowed_audiences=allowed_audiences_from_env(client_id),
         clients=client_directory(),
     )
     server = MCPServer(
