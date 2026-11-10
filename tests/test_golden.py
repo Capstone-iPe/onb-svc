@@ -178,7 +178,7 @@ def test_kirana_is_grocery_and_retail_is_permitted() -> None:
 
 @pytest.mark.parametrize(
     "business_type",
-    ["Hawala desk", "Hundi transfer", "Forex counter", "Crypto exchange", "Gambling shop"],
+    ["Hawala desk", "Hundi transfer", "Forex counter", "Money transfer kiosk", "Crypto exchange", "Gambling shop"],
 )
 def test_a_refused_type_gets_no_review_id_even_with_a_complete_pack(business_type: str) -> None:
     store = MemoryApplicationStore()
@@ -272,6 +272,15 @@ def test_a_crore_and_a_fractional_lakh_are_one_figure() -> None:
 def test_a_yes_sentence_asks_for_the_addendum() -> None:
     store = MemoryApplicationStore()
     application_id = _shop(store, "Cafe", phones="Yes, for loyalty.")
+
+    files = ask(store, application_id)["snapshot"]["files"]
+
+    assert ADDENDUM in files, "ONB-POL-003 §2"
+
+
+def test_haan_means_phones_are_stored() -> None:
+    store = MemoryApplicationStore()
+    application_id = _shop(store, "Restaurant", phones="Haan, we save them.")
 
     files = ask(store, application_id)["snapshot"]["files"]
 

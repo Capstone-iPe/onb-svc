@@ -28,7 +28,7 @@ Leave these off the server: activate, waive, mark-complete, change-volume, creat
 
 Field order, one pending item at a time: `shop_name`, `city`, `business_type`, `monthly_volume`, `payment_methods`, `stores_payer_phones`, then `business_registration`, `owner_id`, `bank_proof`, `shopfront_photo`, then `dpa_addendum` only when payer phones are stored, then an optional `note`.
 
-`monthly_volume` is a rupee figure: digits, such as `₹12,00,000`, or a number of lakh or crore, such as `Rs. 12 lakh` and `41 lakh` (ONB-POL-002 §4.1, ONB-ANX-002). A sentence that is not that figure, including "please treat us as thirty-nine lakh", is `volume_unreadable` and the field stays pending. `stores_payer_phones` is yes or no. A longer answer counts when its first word is yes or no, such as `Yes, for loyalty.` and `No, we don't store them.` Anything else is `phones_not_yes_or_no`. Shop name, city, business type, payment methods, and note stay free text. Note may be empty. A blank required answer does not advance.
+`monthly_volume` is a rupee figure: digits, such as `₹12,00,000`, or a number of lakh or crore, such as `Rs. 12 lakh` and `41 lakh` (ONB-POL-002 §4.1, ONB-ANX-002). A sentence that is not that figure, including "please treat us as thirty-nine lakh", is `volume_unreadable` and the field stays pending. `stores_payer_phones` is yes or no. A longer answer counts when its first word is yes, haan, or no, such as `Yes, for loyalty.`, `Haan, we save them.`, and `No, we don't store them.` Anything else is `phones_not_yes_or_no`. Shop name, city, business type, payment methods, and note stay free text. Note may be empty. A blank required answer does not advance.
 
 The pack is those four upload slots. Do not add GSTIN, Udyam, FSSAI, a licence, or another id document as a slot.
 
@@ -40,7 +40,7 @@ Existing error codes: `unknown_application`, `field_not_pending`, `empty_answer`
 
 `decide` returns the ADR §6 object with `review_id` still empty. The caller allocates. Outcomes are `RECOMMEND_GO_LIVE`, `IN_REVIEW`, and `REFUSED`. Assignees are `MERCHANT_RISK_LEAD` and `HEAD_OF_PAYMENTS`. `₹40,00,000` inclusive stays with Merchant Risk Lead. `₹40,00,001` and above is Head of Payments, and `policy_conflict_noted` is true only then.
 
-A refused type gets `review_id` null and no assignee. A complete pack does not cure it. An unlisted type stays `IN_REVIEW` and still gets a review id. Cafe, coffee shop, and dhaba are restaurant. Kirana is grocery. A refused word wins over a kinder word.
+A refused type gets `review_id` null and no assignee. A complete pack does not cure it. An unlisted type stays `IN_REVIEW` and still gets a review id. Cafe, coffee shop, and dhaba are restaurant. Kirana is grocery. A money transfer kiosk is a money service. A refused word wins over a kinder word.
 
 `RECOMMEND_GO_LIVE` does not turn the shop on. There is no activate path.
 

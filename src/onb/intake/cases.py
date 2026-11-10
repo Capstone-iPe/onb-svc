@@ -86,7 +86,7 @@ def ask(store: ApplicationStore, application_id: str | None) -> dict:
 def save_answer(store: ApplicationStore, application_id: str, field: str, value: str) -> dict:
     """Store the pending answer, or replace an answer already stored before submit.
 
-    After the verdict, a stored answer stays as stored. The words do not choose a field that has not been reached, skip one, or submit. monthly_volume is digits or a number of lakh or crore. stores_payer_phones starts with yes or no.
+    After the verdict, a stored answer stays as stored. The words do not choose a field that has not been reached, skip one, or submit. monthly_volume is digits or a number of lakh or crore. stores_payer_phones starts with yes, haan, or no.
     """
     snapshot = store.get(application_id)
     if snapshot is None:

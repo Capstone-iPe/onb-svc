@@ -11,6 +11,7 @@ _REFUSED = (
     "hundi",
     "forex",
     "money service",
+    "money transfer",
     "remittance",
     "crypto",
     "bitcoin",
@@ -36,7 +37,7 @@ _PERMITTED = {
 _LAKH = 100_000
 _CRORE = 10_000_000
 _VOLUME_UNIT = re.compile(r"^(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores)$")
-_YES = {"yes", "y", "true"}
+_YES = {"yes", "y", "true", "haan"}
 _NO = {"no", "n", "false"}
 
 
