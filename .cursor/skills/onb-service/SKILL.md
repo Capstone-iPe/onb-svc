@@ -10,7 +10,7 @@ description: >-
 
 # ONB service
 
-This process is deterministic Python. It has no model. The copilot is the MCP client. Read [ADR-0001](https://github.com/Capstone-iPe/analysis/blob/main/docs/ADR-0001-architecture.md) before adding a capability. If the change is not already a tool, a field, an error code, or a package below, stop and ask. Do not invent it.
+This process is deterministic Python. It has no model. The copilot is the MCP client. Read [ADR-0001](https://github.com/Capstone-iPe/analysis/blob/main/ADR-0001-architecture.md) before adding a capability. If the change is not already a tool, a field, an error code, or a package below, stop and ask. Do not invent it.
 
 ## Closed tool list
 
