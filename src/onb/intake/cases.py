@@ -221,6 +221,7 @@ def save_file(
         "verifier": evidence.get("verifier", "rules"),
         "tier": tier,
         "injection_flagged": injection_flagged,
+        "evidence": evidence,
         "snapshot": shown_snapshot(snapshot),
     }
     if isinstance(snapshot.get("verdict"), dict):
