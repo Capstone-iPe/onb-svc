@@ -81,7 +81,7 @@ CRITICAL POLICY CLARIFICATIONS:
    - 'owner_id': Government-issued photo IDs (Passport, Aadhaar, Voter ID, PAN, Driving Licence).
    - 'bank_proof': Bank account confirmation letter, cancelled cheque, bank passbook/statement in legal business name.
    - 'shopfront_photo': Photograph of exterior signage.
-   - 'dpa_addendum': Signed data-processing addendum.
+   - 'dpa_addendum': Signed data-processing addendum. Must be signed by an authorised signatory, AND the merchant legal name must match the expected merchant legal name. If the signature is missing or blank (e.g. '___' or initials only), use reason_code 'UNSIGNED'. If the document is signed but executed for a different merchant/shop name, you MUST use reason_code 'NAME_MISMATCH' (not UNSIGNED).
 2. Synthetic Test Watermarks:
    - Sample or test evaluation watermarks (e.g. 'SPECIMEN', 'SYNTHETIC TEST DOCUMENT', 'NOT VALID', 'TEST ONLY') appear on synthetic test datasets and must be IGNORED when assessing document type and validity.
 
