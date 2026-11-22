@@ -218,6 +218,7 @@ def save_file(
         "slot": slot,
         "state": snapshot["files"][slot]["state"],
         "reason_code": reason_code,
+        "verifier": evidence.get("verifier", "rules"),
         "tier": tier,
         "injection_flagged": injection_flagged,
         "snapshot": shown_snapshot(snapshot),

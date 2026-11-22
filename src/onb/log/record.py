@@ -9,7 +9,7 @@ from onb.log.formatter import Formatter
 
 logger = logging.getLogger("onb")
 
-_FIELDS = ("application_id", "error", "field", "slot", "state", "reason_code")
+_FIELDS = ("application_id", "error", "field", "slot", "state", "reason_code", "verifier")
 
 
 def configure() -> None:
