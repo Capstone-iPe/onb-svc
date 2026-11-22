@@ -24,8 +24,8 @@ services:
       - key: CHAT_MODEL
         value: Qwen/Qwen3-8B
       - key: CHAT_API_KEY
-        sync: false
+        value: sk-k7z_l74TPrll1zJzBNy5O99oPxh2csyCUSOzmk_bFXw
       - key: CORPUS_SEARCH_URL
         value: https://onb-corpus.onrender.com
       - key: CORPUS_API_KEY
-        sync: false
+        value: HM2TkOi7RQSfi8n5lE6I0pfsK9sT9yLnxGweJ6zkKkQ
