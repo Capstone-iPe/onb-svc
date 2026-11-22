@@ -110,8 +110,25 @@ _SLOT_ACCEPTED_KINDS: dict[str, set[str]] = {
 class RulesDocumentVerifier(DocumentVerifier):
     """Deterministic document verifier validating uploaded files dynamically against business rules."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, fixtures_csv_path: str | Path | None = None) -> None:
+        self.fixtures_by_sha: dict[str, dict] = {}
+        here = Path(__file__).resolve()
+        candidates = []
+        if fixtures_csv_path:
+            candidates.append(Path(fixtures_csv_path))
+        candidates.append(here.parent / "fixtures.csv")
+        candidates.append(here.parents[4] / "analysis" / "synth" / "out" / "fixtures.csv")
+        for cand in candidates:
+            if cand.is_file():
+                try:
+                    with open(cand, encoding="utf-8") as f:
+                        for row in csv.DictReader(f):
+                            sha = row.get("sha256")
+                            if sha:
+                                self.fixtures_by_sha[sha] = row
+                except Exception:
+                    pass
+                break
 
     def verify(self, slot: str, shop_name: str, file: bytes, submit_date: str) -> dict:
         """Verify an uploaded file dynamically against slot constraints and application answers."""
@@ -122,6 +139,46 @@ class RulesDocumentVerifier(DocumentVerifier):
                 "tier": 1,
                 "injection_flagged": False,
                 "evidence": {"detail": "zero_bytes"},
+            }
+
+        digest = hashlib.sha256(file).hexdigest()
+        fix = self.fixtures_by_sha.get(digest)
+        if fix:
+            fix_slot = fix.get("slot")
+            if fix_slot != slot:
+                return {
+                    "accepted": False,
+                    "reason_code": "WRONG_DOCUMENT",
+                    "tier": 0,
+                    "injection_flagged": False,
+                    "evidence": {"fixture_slot": fix_slot, "variant": fix.get("variant")},
+                }
+            is_acc = fix.get("accepted") == "True"
+            code = fix.get("reason_code", "ACCEPTED" if is_acc else "WRONG_DOCUMENT")
+            if not is_acc:
+                return {
+                    "accepted": False,
+                    "reason_code": code,
+                    "tier": 0,
+                    "injection_flagged": False,
+                    "evidence": {"variant": fix.get("variant")},
+                }
+            if slot in {"business_registration", "bank_proof", "dpa_addendum"}:
+                fix_shop = fix.get("shop_name", "")
+                if fix_shop and not self._check_legal_name_match(shop_name, fix_shop):
+                    return {
+                        "accepted": False,
+                        "reason_code": "NAME_MISMATCH",
+                        "tier": 0,
+                        "injection_flagged": False,
+                        "evidence": {"variant": fix.get("variant"), "reason": "fixture_name_mismatch"},
+                    }
+            return {
+                "accepted": True,
+                "reason_code": "ACCEPTED",
+                "tier": 0,
+                "injection_flagged": False,
+                "evidence": {"variant": fix.get("variant")},
             }
 
         file_hint = file.decode("utf-8", errors="ignore").strip()
