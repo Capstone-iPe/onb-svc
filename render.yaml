@@ -9,7 +9,7 @@ services:
     name: onb
     runtime: python
     plan: free
-    buildCommand: pip install --upgrade --force-reinstall --no-deps . && pip install .
+    buildCommand: pip install -r requirements.txt && pip install --upgrade --force-reinstall --no-deps .
     startCommand: python -m onb
     healthCheckPath: /health
     envVars:
