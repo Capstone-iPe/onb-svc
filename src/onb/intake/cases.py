@@ -155,13 +155,18 @@ def save_file(
         pending is not None and pending.get("kind") == "upload" and pending.get("name") == slot
     )
     slot_file = shown["files"].get(slot)
+    already = (
+        not isinstance(snapshot.get("verdict"), dict)
+        and isinstance(slot_file, dict)
+        and slot_file.get("state") in {"accepted", "missing"}
+    )
     filling_gap = (
         isinstance(snapshot.get("verdict"), dict)
         and isinstance(slot_file, dict)
         and slot_file.get("state") != "accepted"
         and not missing
     )
-    if not on_pending and not filling_gap:
+    if not on_pending and not already and not filling_gap:
         return {"error": "slot_not_pending", "slot": slot, "pending": pending}
     payload = file_bytes(file)
     if missing and payload:

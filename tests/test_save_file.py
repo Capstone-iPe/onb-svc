@@ -155,3 +155,16 @@ def test_slot_mismatch_document_rejected() -> None:
     res3 = verifier.verify("shopfront_photo", "theobromine restaurant", b"interior_view.jpg", "2026-11-21")
     assert res3["accepted"] is False
     assert res3["reason_code"] in {"NOT_SHOPFRONT", "not_shopfront"}
+
+
+def test_replace_already_accepted_file_before_submit() -> None:
+    store = MemoryApplicationStore()
+    application_id = _at_registration(store)
+
+    first = save_file(store, application_id, "business_registration", "registration.pdf")
+    assert first["state"] == "accepted"
+
+    # Now replace the business registration before submit
+    replaced = save_file(store, application_id, "business_registration", "new_registration.pdf")
+    assert replaced["state"] == "accepted"
+
