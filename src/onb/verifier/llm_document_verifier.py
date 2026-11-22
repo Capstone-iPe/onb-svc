@@ -364,7 +364,7 @@ class LlmDocumentVerifier(DocumentVerifier):
         }
 
         verify_param = self.ca_cert or False
-        with httpx.Client(timeout=10.0, verify=verify_param) as client:
+        with httpx.Client(timeout=20.0, verify=verify_param) as client:
             resp = client.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
