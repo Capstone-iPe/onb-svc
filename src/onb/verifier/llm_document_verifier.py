@@ -33,6 +33,9 @@ from onb.verifier.rules_document_verifier import (
 log = logging.getLogger("onb.verifier")
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_WATERMARKS_RE = re.compile(
+    r"(?i)\b(?:SPECIMEN|SYNTHETIC TEST DOCUMENT|NOT VALID|NOT AN OFFICIAL RECORD|FICTIONAL|TEST DATA ONLY|TEST ONLY)\b[^\n]*",
+)
 
 SLOT_POLICY_QUERIES: dict[str, str] = {
     "business_registration": "business registration certificate shop establishment incorporation company name match",
@@ -127,7 +130,8 @@ class LlmDocumentVerifier(DocumentVerifier):
         # 2. Extract text & detect prompt injection
         file_hint = file.decode("utf-8", errors="ignore").strip()
         ext = self._rules_fallback._detect_extension(file, file_hint)
-        text = self._rules_fallback._extract_text(file, ext, file_hint)
+        raw_text = self._rules_fallback._extract_text(file, ext, file_hint)
+        text = _WATERMARKS_RE.sub("", raw_text).strip()
         injection_flagged = bool(_INJECTION_RE.search(text))
 
         # Check for test hook keyword "reject"
