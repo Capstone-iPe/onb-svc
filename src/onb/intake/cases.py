@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -45,7 +46,10 @@ def stores_phones(value: object) -> bool:
 def shown_snapshot(snapshot: dict) -> dict:
     """The review draft. The addendum slot appears only when payer phones are stored."""
     shown = copy.deepcopy(snapshot)
-    if stores_phones(shown["answers"].get("stores_payer_phones")):
+    phones_val = shown["answers"].get("stores_payer_phones")
+    if phones_val is None:
+        phones_val = shown["answers"].get("store_payer_phone") or shown["answers"].get("stores_payer_phone")
+    if stores_phones(phones_val):
         shown["files"].setdefault(ADDENDUM, {"state": "pending"})
     else:
         shown["files"].pop(ADDENDUM, None)
@@ -166,14 +170,27 @@ def save_file(
         return saved
     if not payload:
         return {"error": "file_missing", "slot": slot}
-    checker = verifier or MockDocumentVerifier()
-    shop_name = str(snapshot["answers"].get("shop_name") or "")
-    result = checker.verify(slot, shop_name, payload, submit_date or date.today().isoformat())
-    accepted = bool(result.get("accepted"))
-    reason_code = str(result.get("reason_code") or ("ok" if accepted else "rejected"))
+    digest = hashlib.sha256(payload).hexdigest()
+    if _held_by_other_slot(snapshot, slot, digest):
+        # One file cannot satisfy two pack slots (the same bytes were already accepted elsewhere).
+        accepted, reason_code = False, "duplicate_file"
+        tier, injection_flagged, evidence = 0, False, {}
+    else:
+        checker = verifier or MockDocumentVerifier()
+        shop_name = str(snapshot["answers"].get("shop_name") or "")
+        result = checker.verify(slot, shop_name, payload, submit_date or date.today().isoformat())
+        accepted = bool(result.get("accepted"))
+        reason_code = str(result.get("reason_code") or ("ok" if accepted else "rejected"))
+        tier = int(result.get("tier", 0))
+        injection_flagged = bool(result.get("injection_flagged", False))
+        evidence = result.get("evidence") or {}
     snapshot["files"][slot] = {
         "state": "accepted" if accepted else "pending",
         "reason_code": reason_code,
+        "sha256": digest,
+        "tier": tier,
+        "injection": injection_flagged,
+        "evidence": evidence,
     }
     _refresh_verdict(snapshot)
     if not store.replace(application_id, snapshot):
@@ -183,11 +200,20 @@ def save_file(
         "slot": slot,
         "state": snapshot["files"][slot]["state"],
         "reason_code": reason_code,
+        "tier": tier,
+        "injection_flagged": injection_flagged,
         "snapshot": shown_snapshot(snapshot),
     }
     if isinstance(snapshot.get("verdict"), dict):
         saved["verdict"] = snapshot["verdict"]
     return saved
+
+
+def _held_by_other_slot(snapshot: dict, slot: str, digest: str) -> bool:
+    return any(
+        other != slot and file.get("state") == "accepted" and file.get("sha256") == digest
+        for other, file in snapshot["files"].items()
+    )
 
 
 def _refresh_verdict(snapshot: dict) -> None:

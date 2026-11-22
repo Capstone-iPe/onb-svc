@@ -105,3 +105,52 @@ def test_unknown_application_is_an_error() -> None:
     store = MemoryApplicationStore()
     result = save_file(store, "app_missing", "business_registration", "registration.pdf")
     assert result == {"error": "unknown_application", "application_id": "app_missing"}
+
+
+def test_one_file_cannot_fill_two_slots() -> None:
+    """Replay: the registration file was re-uploaded as the signed addendum and accepted."""
+    store = MemoryApplicationStore()
+    created = ask(store, None)
+    application_id = created["application_id"]
+    for field, value in {
+        "shop_name": "theobromine restaurant",
+        "city": "Adoni",
+        "business_type": "restaurant",
+        "monthly_volume": "5 lakhs",
+        "payment_methods": "UPI, cards, cash, wallet",
+        "stores_payer_phones": "yes we keep payers phone number",
+    }.items():
+        save_answer(store, application_id, field, value)
+    for slot, name in (
+        ("business_registration", "business_registration_1_reg_pdf.pdf"),
+        ("owner_id", "owner_id_1_id_card_jpg.jpg"),
+        ("bank_proof", "bank_proof_1_bank_letter.pdf"),
+        ("shopfront_photo", "shopfront_photo_1_front_dark.jpg"),
+    ):
+        assert save_file(store, application_id, slot, name)["state"] == "accepted"
+
+    reused = save_file(store, application_id, "dpa_addendum", "business_registration_1_reg_pdf.pdf")
+
+    assert reused["state"] == "pending"
+    assert reused["reason_code"] == "duplicate_file"
+    assert ask(store, application_id)["pending"] == {"kind": "upload", "name": "dpa_addendum"}
+    own = save_file(store, application_id, "dpa_addendum", "signed_dpa.pdf")
+    assert own["state"] == "accepted"
+
+
+def test_slot_mismatch_document_rejected() -> None:
+    verifier = MockDocumentVerifier()
+    # A registration PDF uploaded to dpa_addendum
+    res = verifier.verify("dpa_addendum", "theobromine restaurant", b"business_registration_1_reg_pdf.pdf", "2026-11-21")
+    assert res["accepted"] is False
+    assert res["reason_code"] == "wrong_document"
+
+    # A utility bill uploaded to bank_proof
+    res2 = verifier.verify("bank_proof", "theobromine restaurant", b"utility_bill.pdf", "2026-11-21")
+    assert res2["accepted"] is False
+    assert res2["reason_code"] == "wrong_document"
+
+    # An interior photo uploaded to shopfront_photo
+    res3 = verifier.verify("shopfront_photo", "theobromine restaurant", b"interior_view.jpg", "2026-11-21")
+    assert res3["accepted"] is False
+    assert res3["reason_code"] == "not_shopfront"

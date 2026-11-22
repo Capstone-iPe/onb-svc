@@ -47,6 +47,7 @@ def parse_volume(value: str) -> int | None:
     Digits, or a number of lakh or crore. A sentence around the figure is not a figure.
     """
     text = value.strip().lower().replace("₹", "").replace(",", "")
+    text = re.sub(r"\b(?:about|around|approx\.?|roughly)\b", "", text)
     text = re.sub(r"\brs\.?|\binr\b", "", text)
     text = " ".join(text.split())
     if text.isdigit():
@@ -108,9 +109,14 @@ def decide(answers: dict, files: dict) -> dict:
         for slot, file in files.items()
         if file.get("state") != "accepted"
     ]
-    phones = phone_stored(answers.get("stores_payer_phones")) is True
+    raw_phones = answers.get("stores_payer_phones")
+    if raw_phones is None:
+        raw_phones = answers.get("store_payer_phone") or answers.get("stores_payer_phone")
+    phones = phone_stored(raw_phones) is True
     addendum_required = phones
-    flagged = injection_flagged(answers.get("note"))
+    flagged = injection_flagged(answers.get("note")) or any(
+        isinstance(f, dict) and bool(f.get("injection")) for f in files.values()
+    )
     above = volume is not None and volume > CEILING_INR
     citations: list[str] = ["ONB-POL-001 §3"]
     if gaps:
