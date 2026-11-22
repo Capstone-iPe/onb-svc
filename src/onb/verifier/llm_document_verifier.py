@@ -15,6 +15,12 @@ from typing import Any
 
 import httpx
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from onb.verifier.document_verifier import DocumentVerifier
 from onb.verifier.rules_document_verifier import (
     _ALLOWED_EXT,
@@ -340,3 +346,4 @@ class LlmDocumentVerifier(DocumentVerifier):
             except Exception:
                 pass
         return None
+
