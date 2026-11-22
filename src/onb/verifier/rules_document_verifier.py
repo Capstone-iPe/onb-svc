@@ -1,11 +1,10 @@
 """Document Verifier implementing LLD-0001: Tier 0, Tier 1, and Tier 2.
 
-Deterministic verification: no LLM model calls in this path.
+Deterministic dynamic verification using pypdf and OCR (when available): no static fixtures or mock tables.
 """
 
 from __future__ import annotations
 
-import csv
 import datetime as dt
 import hashlib
 import io
@@ -27,6 +26,12 @@ try:
     _PYPDF_AVAILABLE = True
 except ImportError:
     _PYPDF_AVAILABLE = False
+
+try:
+    import pytesseract
+    _PYTESSERACT_AVAILABLE = True
+except ImportError:
+    _PYTESSERACT_AVAILABLE = False
 
 
 _ALLOWED_EXT = {".pdf", ".jpg", ".jpeg", ".png"}
@@ -111,24 +116,8 @@ class RulesDocumentVerifier(DocumentVerifier):
     """Deterministic document verifier validating uploaded files dynamically against business rules."""
 
     def __init__(self, fixtures_csv_path: str | Path | None = None) -> None:
-        self.fixtures_by_sha: dict[str, dict] = {}
-        here = Path(__file__).resolve()
-        candidates = []
-        if fixtures_csv_path:
-            candidates.append(Path(fixtures_csv_path))
-        candidates.append(here.parent / "fixtures.csv")
-        candidates.append(here.parents[4] / "analysis" / "synth" / "out" / "fixtures.csv")
-        for cand in candidates:
-            if cand.is_file():
-                try:
-                    with open(cand, encoding="utf-8") as f:
-                        for row in csv.DictReader(f):
-                            sha = row.get("sha256")
-                            if sha:
-                                self.fixtures_by_sha[sha] = row
-                except Exception:
-                    pass
-                break
+        # Fixtures are strictly avoided in production verification per project directives.
+        pass
 
     def verify(self, slot: str, shop_name: str, file: bytes, submit_date: str) -> dict:
         """Verify an uploaded file dynamically against slot constraints and application answers."""
@@ -139,46 +128,6 @@ class RulesDocumentVerifier(DocumentVerifier):
                 "tier": 1,
                 "injection_flagged": False,
                 "evidence": {"detail": "zero_bytes"},
-            }
-
-        digest = hashlib.sha256(file).hexdigest()
-        fix = self.fixtures_by_sha.get(digest)
-        if fix:
-            fix_slot = fix.get("slot")
-            if fix_slot != slot:
-                return {
-                    "accepted": False,
-                    "reason_code": "WRONG_DOCUMENT",
-                    "tier": 0,
-                    "injection_flagged": False,
-                    "evidence": {"fixture_slot": fix_slot, "variant": fix.get("variant")},
-                }
-            is_acc = fix.get("accepted") == "True"
-            code = fix.get("reason_code", "ACCEPTED" if is_acc else "WRONG_DOCUMENT")
-            if not is_acc:
-                return {
-                    "accepted": False,
-                    "reason_code": code,
-                    "tier": 0,
-                    "injection_flagged": False,
-                    "evidence": {"variant": fix.get("variant")},
-                }
-            if slot in {"business_registration", "bank_proof", "dpa_addendum"}:
-                fix_shop = fix.get("shop_name", "")
-                if fix_shop and not self._check_legal_name_match(shop_name, fix_shop):
-                    return {
-                        "accepted": False,
-                        "reason_code": "NAME_MISMATCH",
-                        "tier": 0,
-                        "injection_flagged": False,
-                        "evidence": {"variant": fix.get("variant"), "reason": "fixture_name_mismatch"},
-                    }
-            return {
-                "accepted": True,
-                "reason_code": "ACCEPTED",
-                "tier": 0,
-                "injection_flagged": False,
-                "evidence": {"variant": fix.get("variant")},
             }
 
         file_hint = file.decode("utf-8", errors="ignore").strip()
@@ -275,9 +224,36 @@ class RulesDocumentVerifier(DocumentVerifier):
                 except Exception:
                     pass
 
-        # ------------------------------------------------------------------- Tier 2: Text Layer
+        # ------------------------------------------------------------------- Text Extraction
+        is_binary_image = file.startswith((b"\xff\xd8\xff", b"\x89PNG"))
         text = self._extract_text(file, ext, file_hint)
         lowered = text.lower()
+
+        # If it's a binary image and no text could be extracted via OCR:
+        if is_binary_image and not text.strip():
+            if slot == "shopfront_photo":
+                # Valid shopfront photo
+                return {
+                    "accepted": True,
+                    "reason_code": "ACCEPTED",
+                    "tier": 1,
+                    "injection_flagged": False,
+                    "evidence": {"format": ext},
+                }
+            # For documents (owner_id, bank_proof, business_registration, dpa_addendum):
+            # Accept the image upload so merchant is not falsely rejected with name mismatch,
+            # but mark evidence for manual human reviewer review.
+            return {
+                "accepted": True,
+                "reason_code": "ACCEPTED",
+                "tier": 2,
+                "injection_flagged": False,
+                "evidence": {
+                    "needs_review": True,
+                    "detail": "image_requires_manual_verification",
+                    "format": ext,
+                },
+            }
 
         # Instruction injection scan
         injection = bool(_INJECTION_RE.search(text))
@@ -427,9 +403,22 @@ class RulesDocumentVerifier(DocumentVerifier):
                         extracted.append(txt)
             except Exception:
                 pass
+        elif ext in {".jpg", ".jpeg", ".png"} and _PYTESSERACT_AVAILABLE and _PIL_AVAILABLE and file.startswith((b"\xff\xd8\xff", b"\x89PNG")):
+            try:
+                im = Image.open(io.BytesIO(file))
+                txt = pytesseract.image_to_string(im)
+                if txt:
+                    extracted.append(txt)
+            except Exception:
+                pass
+
         if extracted:
             return "\n".join(extracted)
-        return file.decode("utf-8", errors="ignore")
+
+        # In testing/stubs, fallback to string hint if not raw image binary
+        if not file.startswith((b"\xff\xd8\xff", b"\x89PNG")):
+            return file.decode("utf-8", errors="ignore")
+        return ""
 
     def _classify_doc_kind(self, text: str) -> tuple[str | None, int]:
         best_kind, best_score = None, 0
@@ -442,14 +431,15 @@ class RulesDocumentVerifier(DocumentVerifier):
     def _normalize_name_tokens(self, name: str) -> set[str]:
         cleaned = re.sub(r"[^\w\s]", " ", name.lower())
         tokens = set(cleaned.split())
-        return tokens - _LEGAL_STOPWORDS
+        non_stop = tokens - _LEGAL_STOPWORDS
+        return non_stop if non_stop else tokens
 
     def _check_legal_name_match(self, shop_name: str, document_text: str) -> bool:
         """Token-set ratio >= 0.85 per LLD-0001 §6."""
         shop_tokens = self._normalize_name_tokens(shop_name)
         if not shop_tokens:
             return True
-        doc_tokens = self._normalize_name_tokens(document_text)
+        doc_tokens = set(re.findall(r"\w+", document_text.lower()))
         if not doc_tokens:
             # If plain text hint has no tokens, fallback to substring
             return shop_name.strip().lower() in document_text.lower()

@@ -140,8 +140,15 @@ def decide(answers: dict, files: dict) -> dict:
         citations.extend(["ONB-POL-001 §4", "ONB-POL-002"])
     elif volume is not None:
         citations.append("ONB-POL-002")
+    has_review_files = any(
+        isinstance(f, dict) and (
+            f.get("needs_review")
+            or (isinstance(f.get("evidence"), dict) and f.get("evidence", {}).get("needs_review"))
+        )
+        for f in files.values()
+    )
     complete = not gaps
-    outcome = "RECOMMEND_GO_LIVE" if kind == "permitted" and complete else "IN_REVIEW"
+    outcome = "RECOMMEND_GO_LIVE" if (kind == "permitted" and complete and not has_review_files) else "IN_REVIEW"
     assignee = "HEAD_OF_PAYMENTS" if above else "MERCHANT_RISK_LEAD"
     return {
         "outcome": outcome,
