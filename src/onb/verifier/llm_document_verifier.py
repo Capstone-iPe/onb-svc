@@ -16,11 +16,21 @@ from typing import Any
 
 import httpx
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+if "pytest" not in sys.modules and not os.environ.get("PYTEST_CURRENT_TEST"):
+    try:
+        from dotenv import load_dotenv
+        for candidate in (
+            Path.cwd() / ".env",
+            Path.cwd() / "copilot-svc.env",
+            Path(__file__).resolve().parents[3] / "copilot-svc.env",
+            Path(__file__).resolve().parents[3] / "copilot-svc" / ".env",
+            Path("/Users/raph/capstone/copilot-svc.env"),
+        ):
+            if candidate.is_file():
+                load_dotenv(candidate)
+                break
+    except ImportError:
+        pass
 
 from onb.verifier.document_verifier import DocumentVerifier
 from onb.verifier.rules_document_verifier import (
