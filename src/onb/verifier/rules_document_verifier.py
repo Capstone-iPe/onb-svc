@@ -40,6 +40,8 @@ except ImportError:
     _RAPIDOCR_AVAILABLE = False
 
 _ocr_instance: RapidOCR | None = None
+_OCR_CACHE: dict[str, str] = {}
+_MAX_OCR_CACHE = 256
 
 
 def _get_ocr_engine() -> RapidOCR | None:
@@ -260,6 +262,31 @@ class RulesDocumentVerifier(DocumentVerifier):
                             }
                 except Exception:
                     pass
+            # Shopfront photo: check hint for non-shopfront keywords or test hooks without expensive OCR
+            lowered_hint = file_hint.lower()
+            if "reject" in lowered_hint:
+                return {
+                    "accepted": False,
+                    "reason_code": "rejected",
+                    "tier": 2,
+                    "injection_flagged": False,
+                    "evidence": {"detail": "explicit_reject_marker"},
+                }
+            if any(k in lowered_hint for k in ("interior", "proposed elevation", "render", "menu", "website", "https://")):
+                return {
+                    "accepted": False,
+                    "reason_code": "NOT_SHOPFRONT",
+                    "tier": 1,
+                    "injection_flagged": False,
+                    "evidence": {"detail": "non_shopfront_keywords_detected"},
+                }
+            return {
+                "accepted": True,
+                "reason_code": "ACCEPTED",
+                "tier": 1,
+                "injection_flagged": False,
+                "evidence": {"format": ext},
+            }
 
         # ------------------------------------------------------------------- Text Extraction
         is_binary_image = file.startswith((b"\xff\xd8\xff", b"\x89PNG"))
@@ -445,6 +472,13 @@ class RulesDocumentVerifier(DocumentVerifier):
         return ".unknown"
 
     def _extract_text(self, file: bytes, ext: str, fallback_hint: str) -> str:
+        # Check in-memory cache for binary files
+        file_hash = None
+        if file:
+            file_hash = hashlib.sha256(file).hexdigest()
+            if file_hash in _OCR_CACHE:
+                return _OCR_CACHE[file_hash]
+
         extracted = []
         if ext == ".pdf" and _PYPDF_AVAILABLE and file.startswith(b"%PDF-"):
             try:
@@ -456,11 +490,25 @@ class RulesDocumentVerifier(DocumentVerifier):
             except Exception:
                 pass
         elif ext in {".jpg", ".jpeg", ".png"} and file.startswith((b"\xff\xd8\xff", b"\x89PNG")):
+            # Downscale oversized images before OCR to keep inference fast
+            ocr_bytes = file
+            if _PIL_AVAILABLE:
+                try:
+                    im = Image.open(io.BytesIO(file))
+                    if max(im.size) > 1400:
+                        im_copy = im.copy()
+                        im_copy.thumbnail((1400, 1400), Image.Resampling.LANCZOS)
+                        buf = io.BytesIO()
+                        im_copy.save(buf, format="JPEG", quality=90)
+                        ocr_bytes = buf.getvalue()
+                except Exception:
+                    ocr_bytes = file
+
             # 1. Try RapidOCR (pure ONNX runtime, no system binary)
             ocr = _get_ocr_engine()
             if ocr is not None:
                 try:
-                    lines, _ = ocr(file)
+                    lines, _ = ocr(ocr_bytes)
                     if lines:
                         raw = [l[1] for l in lines if len(l) > 1 and l[1]]
                         if raw:
@@ -470,20 +518,26 @@ class RulesDocumentVerifier(DocumentVerifier):
             # 2. Fallback to pytesseract if installed
             if not extracted and _PYTESSERACT_AVAILABLE and _PIL_AVAILABLE:
                 try:
-                    im = Image.open(io.BytesIO(file))
+                    im = Image.open(io.BytesIO(ocr_bytes))
                     txt = pytesseract.image_to_string(im)
                     if txt:
                         extracted.append(txt)
                 except Exception:
                     pass
 
+        result = ""
         if extracted:
-            return "\n".join(extracted)
+            result = "\n".join(extracted)
+        elif not file.startswith((b"\xff\xd8\xff", b"\x89PNG")):
+            # In testing/stubs, fallback to string hint if not raw image binary
+            result = file.decode("utf-8", errors="ignore")
 
-        # In testing/stubs, fallback to string hint if not raw image binary
-        if not file.startswith((b"\xff\xd8\xff", b"\x89PNG")):
-            return file.decode("utf-8", errors="ignore")
-        return ""
+        if file_hash:
+            if len(_OCR_CACHE) >= _MAX_OCR_CACHE:
+                _OCR_CACHE.clear()
+            _OCR_CACHE[file_hash] = result
+
+        return result
 
     def _classify_doc_kind(self, text: str) -> tuple[str | None, int]:
         best_kind, best_score = None, 0

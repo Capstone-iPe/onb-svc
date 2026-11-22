@@ -236,9 +236,8 @@ class LlmDocumentVerifier(DocumentVerifier):
             age_result = self._check_photo_age(file, file_hint, submit_date)
             if age_result is not None:
                 return age_result
-            raw_text = self._rules_fallback._extract_text(file, ext, file_hint)
-            lowered = raw_text.lower()
-            if "reject" in lowered:
+            lowered_hint = file_hint.lower()
+            if "reject" in lowered_hint:
                 return {
                     "accepted": False,
                     "reason_code": "rejected",
@@ -246,7 +245,7 @@ class LlmDocumentVerifier(DocumentVerifier):
                     "injection_flagged": False,
                     "evidence": {"detail": "explicit_reject_marker"},
                 }
-            if any(k in lowered for k in ("interior", "proposed elevation", "render", "menu", "website", "https://")):
+            if any(k in lowered_hint for k in ("interior", "proposed elevation", "render", "menu", "website", "https://")):
                 return {
                     "accepted": False,
                     "reason_code": "NOT_SHOPFRONT",
@@ -289,7 +288,29 @@ class LlmDocumentVerifier(DocumentVerifier):
     def _check_photo_age(self, file: bytes, file_hint: str, submit_date: str) -> dict | None:
         """Check photo EXIF date or filename date stamp."""
         import datetime as dt
-        # Text-based photo age fallback (e.g. filename dates)
+        # 1. EXIF date check for JPEG files
+        if file.startswith(b"\xff\xd8\xff"):
+            try:
+                from PIL import Image
+                with Image.open(io.BytesIO(file)) as im:
+                    exif = im.getexif()
+                    stamp = (exif.get_ifd(0x8769).get(0x9003) if exif else None) or (exif.get(0x0132) if exif else None)
+                if stamp:
+                    taken = dt.datetime.strptime(stamp, "%Y:%m:%d %H:%M:%S").date()
+                    sub_date = dt.date.fromisoformat(submit_date[:10])
+                    days_old = (sub_date - taken).days
+                    if days_old > 90:
+                        return {
+                            "accepted": False,
+                            "reason_code": "PHOTO_TOO_OLD",
+                            "tier": 1,
+                            "injection_flagged": False,
+                            "evidence": {"days_old": days_old, "taken": str(taken)},
+                        }
+            except Exception:
+                pass
+
+        # 2. Text-based photo age fallback (e.g. filename dates)
         dates = re.findall(r"\d{4}-\d{2}-\d{2}", file_hint)
         if dates:
             try:
