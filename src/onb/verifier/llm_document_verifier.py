@@ -78,7 +78,7 @@ Your job is to verify whether the extracted document text satisfies policy requi
 CRITICAL POLICY CLARIFICATIONS:
 1. Slot-Specific Acceptance:
    - 'business_registration': Certificate of Registration, Certificate of Registration of Establishment (Shop & Establishment Act Form C), Certificate of Incorporation, GST Certificate, and Udyam Registration are ACCEPTABLE business registrations. Do NOT confuse a Certificate of Registration of Establishment with a trademark certificate. A Certificate of Registration of Establishment IS an accepted business registration. Only actual trademark certificates, utility bills, personal IDs, or invoices are unacceptable.
-   - 'owner_id': Government-issued photo IDs (Passport, Aadhaar, Voter ID, PAN, Driving Licence).
+   - 'owner_id': Government-issued photo IDs of the individual owner/signatory (Passport, Aadhaar, Voter ID, PAN, Driving Licence, Government of India ID card, National Resident card). An owner ID carries the individual human owner's personal name, NOT the merchant/shop name. Do NOT expect or look for the shop/merchant name on an owner ID! Accept any valid government-issued photo ID. Only reject with WRONG_DOCUMENT if it is not a government ID (e.g. personal selfies, staff photos, shop stamps, club cards, visiting cards, utility bills).
    - 'bank_proof': Bank account confirmation letter, cancelled cheque, bank passbook/statement in legal business name.
    - 'shopfront_photo': Photograph of exterior signage.
    - 'dpa_addendum': Signed data-processing addendum. Must be signed by an authorised signatory, AND the merchant legal name must match the expected merchant legal name. If the signature is missing or blank (e.g. '___' or initials only), use reason_code 'UNSIGNED'. If the document is signed but executed for a different merchant/shop name, you MUST use reason_code 'NAME_MISMATCH' (not UNSIGNED).
@@ -366,9 +366,19 @@ class LlmDocumentVerifier(DocumentVerifier):
 
     def _call_llm(self, slot: str, shop_name: str, extracted_text: str, policy_text: str) -> dict | None:
         """Invoke LLM with strict prompt and extract JSON validation verdict."""
+        if slot == "owner_id":
+            merchant_context = (
+                f"Merchant / Shop Name: {shop_name}\n"
+                f"NOTE: The 'owner_id' slot is for the personal identity card of the individual business owner or authorised signatory. "
+                f"Personal IDs carry the individual person's name (e.g. passport, Aadhaar, voter ID, driving licence, national ID) and do NOT contain the shop name '{shop_name}'. "
+                f"Do NOT require or look for the shop name '{shop_name}' on an owner ID. Any authentic government-issued photo ID of an individual is ACCEPTED."
+            )
+        else:
+            merchant_context = f"Expected Legal Merchant Name: {shop_name}"
+
         user_content = (
             f"Slot: {slot}\n"
-            f"Expected Legal Merchant Name: {shop_name}\n"
+            f"{merchant_context}\n"
             f"Policy Requirements:\n{policy_text}\n\n"
             f"Document Extracted Text:\n"
             f"<<<DOCUMENT_START>>>\n"
