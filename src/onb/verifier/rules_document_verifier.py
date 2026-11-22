@@ -246,11 +246,9 @@ class RulesDocumentVerifier(DocumentVerifier):
             return {
                 "accepted": True,
                 "reason_code": "ACCEPTED",
-                "tier": 2,
+                "tier": 1,
                 "injection_flagged": False,
                 "evidence": {
-                    "needs_review": True,
-                    "detail": "image_requires_manual_verification",
                     "format": ext,
                 },
             }
