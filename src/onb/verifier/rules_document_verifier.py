@@ -122,6 +122,7 @@ class RulesDocumentVerifier(DocumentVerifier):
         if env := os.environ.get("FIXTURES_CSV"):
             candidates.append(Path(env))
         here = Path(__file__).resolve()
+        candidates.append(here.parent / "fixtures.csv")
         candidates.append(here.parents[4] / "analysis" / "synth" / "out" / "fixtures.csv")
 
         for cand in candidates:
