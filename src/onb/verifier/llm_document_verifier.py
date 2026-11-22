@@ -38,11 +38,11 @@ _WATERMARKS_RE = re.compile(
 )
 
 SLOT_POLICY_QUERIES: dict[str, str] = {
-    "business_registration": "business registration certificate shop establishment incorporation company name match",
-    "owner_id": "government identity card passport aadhaar driving licence permanent account number pan",
-    "bank_proof": "bank proof account confirmation letter cancelled cheque passbook account holder legal name",
-    "shopfront_photo": "shopfront photo exterior signage recent 90 days physical establishment",
-    "dpa_addendum": "data processing addendum payer phone storage signed counterparty authorised signatory",
+    "business_registration": "ONB-POL-001 ONB-ANX-001 business registration slot document pack legal name",
+    "owner_id": "ONB-POL-001 ONB-ANX-001 owner government identity card passport aadhaar driving licence pan",
+    "bank_proof": "ONB-POL-001 ONB-ANX-001 bank proof cancelled cheque passbook legal name match",
+    "shopfront_photo": "ONB-POL-001 ONB-ANX-001 shopfront photo exterior signage recent 90 days",
+    "dpa_addendum": "ONB-POL-003 ONB-ANX-003 data processing addendum payer telephone storage signed signatory",
 }
 
 DEFAULT_SLOT_POLICIES: dict[str, str] = {
@@ -330,7 +330,7 @@ class LlmDocumentVerifier(DocumentVerifier):
         return None
 
     def _retrieve_slot_policy(self, slot: str) -> str:
-        """Retrieve policy passages from onb-corpus or static fallbacks."""
+        """Retrieve policy passages via RAG from onb-corpus (1st choice), with static fallback."""
         passages: list[str] = []
         if self.corpus_url and self.corpus_key:
             query = SLOT_POLICY_QUERIES.get(slot, slot)
@@ -339,12 +339,18 @@ class LlmDocumentVerifier(DocumentVerifier):
                 with httpx.Client(timeout=3.0, verify=False) as client:
                     resp = client.post(
                         url,
-                        json={"query": query, "k": 2},
+                        json={"query": query, "k": 5},
                         headers={"Authorization": f"Bearer {self.corpus_key}", "Content-Type": "application/json"},
                     )
                     if resp.status_code == 200:
                         hits = resp.json().get("hits") or []
-                        for h in hits:
+                        # Filter to keep operative in-force policy chunks; exclude negative dispute case law (ONB-EVIDENCE-*)
+                        policy_hits = [
+                            h for h in hits
+                            if not str(h.get("document_id") or "").startswith("ONB-EVIDENCE-")
+                            and "## Held" not in str(h.get("text") or "")
+                        ]
+                        for h in policy_hits[:2]:
                             t = h.get("text") or h.get("content") or ""
                             if t.strip():
                                 passages.append(t.strip())
