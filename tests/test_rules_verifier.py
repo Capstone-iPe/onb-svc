@@ -1,5 +1,6 @@
 import datetime as dt
 from pathlib import Path
+import pytest
 
 from onb.intake import ask, save_answer, save_file
 from onb.rules.verdict import decide
@@ -157,7 +158,7 @@ def test_fixture_evaluation_zero_false_accepts() -> None:
     import json
     v = RulesDocumentVerifier()
     fixtures_path = Path(__file__).resolve().parents[3] / "analysis" / "synth" / "out" / "fixtures.csv"
-    apps_root = Path(__file__).resolve().parents[3] / "analysis" / "synth" / "out" / "apps"
+    apps_root = Path(__file__).resolve().parents[2] / "analysis" / "synth" / "out" / "apps"
     if not fixtures_path.is_file() or not apps_root.is_dir():
         return
 
@@ -185,4 +186,61 @@ def test_fixture_evaluation_zero_false_accepts() -> None:
 
     assert tested > 0
     assert false_accepts == 0
+
+
+def test_rules_verifier_jpg_and_png_image_validation() -> None:
+    """Verify that JPG and PNG files undergo OCR text extraction and validation."""
+    v = RulesDocumentVerifier()
+    apps_root = Path(__file__).resolve().parents[2] / "analysis" / "synth" / "out" / "apps"
+    if not apps_root.is_dir():
+        pytest.skip("Synthetic dataset not found")
+
+    app_381 = apps_root / "APP-00381" / "files"
+    if not (app_381 / "business_registration_1_reg_scan_jpg.jpg").is_file():
+        pytest.skip("APP-00381 files not found")
+
+    # 1. Valid JPG registration scan matching legal name -> ACCEPTED
+    reg_data = (app_381 / "business_registration_1_reg_scan_jpg.jpg").read_bytes()
+    res_reg = v.verify("business_registration", "Neem Cafe", reg_data, "2026-11-22")
+    assert res_reg["accepted"] is True
+    assert res_reg["reason_code"] == "ACCEPTED"
+
+    # 2. JPG registration scan with mismatched legal name -> NAME_MISMATCH
+    res_mismatch = v.verify("business_registration", "Spice Kingdom", reg_data, "2026-11-22")
+    assert res_mismatch["accepted"] is False
+    assert res_mismatch["reason_code"] == "NAME_MISMATCH"
+
+    # 3. Studio portrait JPG uploaded to owner_id -> WRONG_DOCUMENT
+    portrait_data = (app_381 / "owner_id_1_studio_portrait.jpg").read_bytes()
+    res_portrait = v.verify("owner_id", "Neem Cafe", portrait_data, "2026-11-22")
+    assert res_portrait["accepted"] is False
+    assert res_portrait["reason_code"] == "WRONG_DOCUMENT"
+
+    # 4. Selfie JPG uploaded to owner_id -> WRONG_DOCUMENT
+    app_377 = apps_root / "APP-00377" / "files"
+    if (app_377 / "owner_id_1_selfie.jpg").is_file():
+        selfie_data = (app_377 / "owner_id_1_selfie.jpg").read_bytes()
+        res_selfie = v.verify("owner_id", "Vibrant Books", selfie_data, "2026-11-22")
+        assert res_selfie["accepted"] is False
+        assert res_selfie["reason_code"] == "WRONG_DOCUMENT"
+
+    # 5. Cancelled cheque JPG matching legal name -> ACCEPTED
+    cheque_data = (app_381 / "bank_proof_1_cancelled_cheque.jpg").read_bytes()
+    res_cheque = v.verify("bank_proof", "Neem Cafe", cheque_data, "2026-11-22")
+    assert res_cheque["accepted"] is True
+    assert res_cheque["reason_code"] == "ACCEPTED"
+
+    # 6. Cancelled cheque JPG with mismatched legal name -> NAME_MISMATCH
+    res_cheque_mismatch = v.verify("bank_proof", "Spice Kingdom", cheque_data, "2026-11-22")
+    assert res_cheque_mismatch["accepted"] is False
+    assert res_cheque_mismatch["reason_code"] == "NAME_MISMATCH"
+
+    # 7. Passbook PNG matching legal name -> ACCEPTED
+    app_236 = apps_root / "APP-00236" / "files"
+    if (app_236 / "bank_proof_1_passbook_png.png").is_file():
+        passbook_data = (app_236 / "bank_proof_1_passbook_png.png").read_bytes()
+        res_pb = v.verify("bank_proof", "Monsoon Art Gallery", passbook_data, "2026-11-22")
+        assert res_pb["accepted"] is True
+        assert res_pb["reason_code"] == "ACCEPTED"
+
 

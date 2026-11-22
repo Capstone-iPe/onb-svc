@@ -178,3 +178,48 @@ def test_llm_verifier_falls_back_to_rules_on_network_error() -> None:
     # Rules verifier catches WRONG_DOCUMENT
     assert res["accepted"] is False
     assert res["reason_code"] == "WRONG_DOCUMENT"
+
+
+def test_llm_verifier_extracts_and_validates_jpg_image() -> None:
+    from pathlib import Path
+    apps_root = Path(__file__).resolve().parents[2] / "analysis" / "synth" / "out" / "apps"
+    reg_jpg = apps_root / "APP-00381" / "files" / "business_registration_1_reg_scan_jpg.jpg"
+    if not reg_jpg.is_file():
+        pytest.skip("APP-00381 image not found")
+
+    v = LlmDocumentVerifier(api_key="test-key", base_url="http://mock-llm/v1")
+    llm_payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "accepted": True,
+                            "reason_code": "ACCEPTED",
+                            "evidence": {
+                                "detected_doc_type": "registration_certificate",
+                                "legal_name_found": "Neem Cafe",
+                                "reason": "Extracted OCR text confirms valid registration for Neem Cafe.",
+                            },
+                        }
+                    )
+                }
+            }
+        ]
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = llm_payload
+
+    with patch.object(httpx.Client, "post", return_value=mock_resp) as mock_post:
+        res = v.verify("business_registration", "Neem Cafe", reg_jpg.read_bytes(), "2026-11-22")
+
+    assert res["accepted"] is True
+    assert res["tier"] == 2
+    assert "Neem Cafe" in res["evidence"]["reason"]
+    # Check that extracted text was actually sent in the prompt to the LLM
+    call_args = mock_post.call_args
+    sent_prompt = str(call_args)
+    assert "Neem Cafe" in sent_prompt or "NeemCafe" in sent_prompt
+

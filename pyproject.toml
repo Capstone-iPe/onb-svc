@@ -9,6 +9,7 @@ dependencies = [
     "pypdf>=4.0",
     "pillow>=10.0",
     "httpx>=0.25",
+    "rapidocr-onnxruntime>=1.2.3",
 ]
 
 [project.optional-dependencies]

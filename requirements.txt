@@ -3,3 +3,4 @@ psycopg[binary]>=3.2
 pypdf>=4.0
 pillow>=10.0
 httpx>=0.25
+rapidocr-onnxruntime>=1.2.3

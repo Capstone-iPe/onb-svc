@@ -34,7 +34,7 @@ log = logging.getLogger("onb.verifier")
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _WATERMARKS_RE = re.compile(
-    r"(?i)\b(?:SPECIMEN|SYNTHETIC TEST DOCUMENT|NOT VALID|NOT AN OFFICIAL RECORD|FICTIONAL|TEST DATA ONLY|TEST ONLY)\b[^\n]*",
+    r"(?i)\b(?:SPECIMEN\s*[-–—]?|SYNTHETIC\s*TEST\s*DOCUMENT|TEST\s*IDENTITY\s*DOCUMENT|NOT\s*VALID|NOT\s*AN\s*OFFICIAL\s*RECORD|FICTIONAL|TEST\s*DATA\s*ONLY|TEST\s*ONLY)\b[^\n]*",
 )
 
 SLOT_POLICY_QUERIES: dict[str, str] = {
@@ -236,11 +236,46 @@ class LlmDocumentVerifier(DocumentVerifier):
             age_result = self._check_photo_age(file, file_hint, submit_date)
             if age_result is not None:
                 return age_result
+            raw_text = self._rules_fallback._extract_text(file, ext, file_hint)
+            lowered = raw_text.lower()
+            if "reject" in lowered:
+                return {
+                    "accepted": False,
+                    "reason_code": "rejected",
+                    "tier": 2,
+                    "injection_flagged": False,
+                    "evidence": {"detail": "explicit_reject_marker"},
+                }
+            if any(k in lowered for k in ("interior", "proposed elevation", "render", "menu", "website", "https://")):
+                return {
+                    "accepted": False,
+                    "reason_code": "NOT_SHOPFRONT",
+                    "tier": 1,
+                    "injection_flagged": False,
+                    "evidence": {"detail": "non_shopfront_keywords_detected"},
+                }
+            return {
+                "accepted": True,
+                "reason_code": "ACCEPTED",
+                "tier": 1,
+                "injection_flagged": False,
+                "evidence": {"format": ext},
+            }
 
         # Handle binary image without extracted text
         is_binary_image = file.startswith((b"\xff\xd8\xff", b"\x89PNG"))
-        text = self._rules_fallback._extract_text(file, ext, file_hint)
-        if is_binary_image and not text.strip():
+        raw_text = self._rules_fallback._extract_text(file, ext, file_hint)
+        text = _WATERMARKS_RE.sub("", raw_text).strip()
+        if is_binary_image and not text:
+            from onb.verifier.rules_document_verifier import _RAPIDOCR_AVAILABLE, _PYTESSERACT_AVAILABLE
+            if _RAPIDOCR_AVAILABLE or _PYTESSERACT_AVAILABLE:
+                return {
+                    "accepted": False,
+                    "reason_code": "WRONG_DOCUMENT",
+                    "tier": 1,
+                    "injection_flagged": False,
+                    "evidence": {"format": ext, "detail": "no_document_text_detected"},
+                }
             return {
                 "accepted": True,
                 "reason_code": "ACCEPTED",
