@@ -123,11 +123,17 @@ def decide(answers: dict, files: dict) -> dict:
         citations.append("ONB-POL-001 §2")
     if addendum_required or flagged:
         citations.append("ONB-POL-003 §2")
+    invalid_items = [
+        {"item": slot, "reason": file.get("reason_code")}
+        for slot, file in files.items()
+        if isinstance(file, dict) and file.get("state") != "accepted" and file.get("reason_code") and file.get("reason_code") != "ok"
+    ]
     if kind == "refused":
         return {
             "outcome": "REFUSED",
             "business_type_allowed": False,
             "missing_items": gaps,
+            "invalid_items": invalid_items,
             "addendum_required": addendum_required,
             "volume_inr": volume,
             "assignee": None,
@@ -147,6 +153,7 @@ def decide(answers: dict, files: dict) -> dict:
         "outcome": outcome,
         "business_type_allowed": kind == "permitted",
         "missing_items": gaps,
+        "invalid_items": invalid_items,
         "addendum_required": addendum_required,
         "volume_inr": volume,
         "assignee": assignee,
