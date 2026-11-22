@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -131,10 +132,11 @@ class LlmDocumentVerifier(DocumentVerifier):
 
         # 3. If no LLM API key configured, use deterministic rules verifier
         if not self.api_key:
-            log.debug("No CHAT_API_KEY set; falling back to RulesDocumentVerifier")
+            log.warning("No CHAT_API_KEY set; falling back to RulesDocumentVerifier")
             return self._rules_fallback.verify(slot, shop_name, file, submit_date)
 
         # 4. Attempt LLM verification with RAG policy
+        log.info("Verifying slot '%s' with LLM model '%s' and RAG policy", slot, self.model)
         try:
             policy_text = self._retrieve_slot_policy(slot)
             llm_decision = self._call_llm(slot, shop_name, text, policy_text)
@@ -148,6 +150,7 @@ class LlmDocumentVerifier(DocumentVerifier):
                 if injection_flagged:
                     evidence["injection_snippet"] = (_INJECTION_RE.search(text).group(0) if _INJECTION_RE.search(text) else "")
 
+                log.info("LLM verified slot '%s': accepted=%s reason_code=%s verifier=llm", slot, accepted, reason_code)
                 return {
                     "accepted": accepted,
                     "reason_code": reason_code,

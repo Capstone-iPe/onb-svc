@@ -19,3 +19,13 @@ services:
         fromDatabase:
           name: onb-db
           property: connectionString
+      - key: CHAT_BASE_URL
+        value: https://103.42.50.41:1032/v1
+      - key: CHAT_MODEL
+        value: Qwen/Qwen3-8B
+      - key: CHAT_API_KEY
+        sync: false
+      - key: CORPUS_SEARCH_URL
+        value: https://onb-corpus.onrender.com
+      - key: CORPUS_API_KEY
+        sync: false
