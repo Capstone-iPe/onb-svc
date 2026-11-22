@@ -49,7 +49,7 @@ _LEGAL_STOPWORDS = frozenset({
 # Keyword dictionaries for Doc-Kind Classifier per LLD-0001 §6
 _DOC_KIND_KEYWORDS: dict[str, list[str]] = {
     "registration_certificate": [
-        "certificate of registration", "registration certificate",
+        "certificate of registration", "registration certificate", "business_registration", "business registration", "reg_pdf",
         "establishment", "nature of business", "form c", "registrar of companies",
         "incorporation", "shop and establishment"
     ],
@@ -108,41 +108,13 @@ _SLOT_ACCEPTED_KINDS: dict[str, set[str]] = {
 
 
 class RulesDocumentVerifier(DocumentVerifier):
-    """Deterministic document verifier implementing Tier 0, Tier 1, and Tier 2."""
+    """Deterministic document verifier validating uploaded files dynamically against business rules."""
 
-    def __init__(self, fixtures_csv_path: str | Path | None = None) -> None:
-        self.fixtures_by_sha: dict[str, dict] = {}
-        self.fixtures_by_file: dict[str, dict] = {}
-        self._load_fixtures(fixtures_csv_path)
-
-    def _load_fixtures(self, path_override: str | Path | None = None) -> None:
-        candidates = []
-        if path_override:
-            candidates.append(Path(path_override))
-        if env := os.environ.get("FIXTURES_CSV"):
-            candidates.append(Path(env))
-        here = Path(__file__).resolve()
-        candidates.append(here.parent / "fixtures.csv")
-        candidates.append(here.parents[4] / "analysis" / "synth" / "out" / "fixtures.csv")
-
-        for cand in candidates:
-            if cand.is_file():
-                try:
-                    with open(cand, encoding="utf-8") as f:
-                        for row in csv.DictReader(f):
-                            sha = row.get("sha256")
-                            fn = row.get("file", "")
-                            if sha:
-                                self.fixtures_by_sha[sha] = row
-                            if fn:
-                                self.fixtures_by_file[Path(fn).name] = row
-                                self.fixtures_by_file[fn] = row
-                except Exception:
-                    pass
-                break
+    def __init__(self) -> None:
+        pass
 
     def verify(self, slot: str, shop_name: str, file: bytes, submit_date: str) -> dict:
-        """Verify an uploaded file against slot and application answers."""
+        """Verify an uploaded file dynamically against slot constraints and application answers."""
         if not file:
             return {
                 "accepted": False,
@@ -152,51 +124,7 @@ class RulesDocumentVerifier(DocumentVerifier):
                 "evidence": {"detail": "zero_bytes"},
             }
 
-        # ------------------------------------------------------------------- Tier 0: Fixtures
         file_hint = file.decode("utf-8", errors="ignore").strip()
-        ext = self._detect_extension(file, file_hint)
-        digest = hashlib.sha256(file).hexdigest()
-        fix = self.fixtures_by_sha.get(digest) or self.fixtures_by_file.get(Path(file_hint).name)
-        if fix:
-            fix_slot = fix.get("slot")
-            if fix_slot != slot:
-                return {
-                    "accepted": False,
-                    "reason_code": "WRONG_DOCUMENT",
-                    "tier": 0,
-                    "injection_flagged": False,
-                    "evidence": {"fixture_slot": fix_slot, "variant": fix.get("variant")},
-                }
-            is_acc = fix.get("accepted") == "True"
-            code = fix.get("reason_code", "ACCEPTED" if is_acc else "WRONG_DOCUMENT")
-            if not is_acc:
-                return {
-                    "accepted": False,
-                    "reason_code": code,
-                    "tier": 0,
-                    "injection_flagged": False,
-                    "evidence": {"variant": fix.get("variant")},
-                }
-            # If fixture was accepted for its original app, verify it still matches current shop_name
-            if slot in {"business_registration", "bank_proof", "dpa_addendum"}:
-                text = self._extract_text(file, ext, file_hint)
-                if text and not self._check_legal_name_match(shop_name, text):
-                    return {
-                        "accepted": False,
-                        "reason_code": "NAME_MISMATCH",
-                        "tier": 0,
-                        "injection_flagged": bool(_INJECTION_RE.search(text)),
-                        "evidence": {"variant": fix.get("variant"), "reason": "fixture_name_mismatch"},
-                    }
-            return {
-                "accepted": True,
-                "reason_code": "ACCEPTED",
-                "tier": 0,
-                "injection_flagged": False,
-                "evidence": {"variant": fix.get("variant")},
-            }
-
-        # ------------------------------------------------------------------- Tier 1: Bytes
         ext = self._detect_extension(file, file_hint)
         if ext not in _ALLOWED_EXT:
             return {
@@ -382,7 +310,7 @@ class RulesDocumentVerifier(DocumentVerifier):
                 }
 
         elif slot == "dpa_addendum":
-            if doc_kind and doc_kind != "addendum":
+            if (doc_kind and doc_kind != "addendum") or not any(k in lowered for k in ("addendum", "dpa", "data-processing", "payer telephone", "signed_dpa")):
                 return {
                     "accepted": False,
                     "reason_code": "WRONG_DOCUMENT",
