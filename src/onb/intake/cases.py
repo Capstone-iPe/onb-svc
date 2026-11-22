@@ -8,7 +8,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from onb.rules import decide, parse_volume, phone_stored
-from onb.verifier import RulesDocumentVerifier, file_bytes
+from onb.verifier import RulesDocumentVerifier, create_document_verifier, file_bytes
 
 if TYPE_CHECKING:
     from onb.store import ApplicationStore
@@ -193,7 +193,7 @@ def save_file(
         accepted, reason_code = False, "duplicate_file"
         tier, injection_flagged, evidence = 0, False, {}
     else:
-        checker = verifier or RulesDocumentVerifier()
+        checker = verifier or create_document_verifier()
         shop_name = str(snapshot["answers"].get("shop_name") or "")
         result = checker.verify(slot, shop_name, payload, submit_date or date.today().isoformat())
         accepted = bool(result.get("accepted"))
