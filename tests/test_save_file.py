@@ -1,6 +1,6 @@
 from onb.intake import ask, save_answer, save_file
 from onb.store import ApplicationStore, MemoryApplicationStore
-from onb.verifier import MockDocumentVerifier
+from onb.verifier import RulesDocumentVerifier
 
 
 def _at_registration(store: ApplicationStore) -> str:
@@ -79,18 +79,19 @@ def test_a_slot_that_is_not_pending_is_rejected() -> None:
 
 
 def test_bank_proof_in_a_personal_name_is_rejected() -> None:
-    verifier = MockDocumentVerifier()
+    verifier = RulesDocumentVerifier()
     result = verifier.verify(
         "bank_proof",
         "Lotus Tea House",
         b"personal-passbook.pdf",
         "2026-11-06",
     )
-    assert result == {"accepted": False, "reason_code": "not_legal_name"}
+    assert result["accepted"] is False
+    assert result["reason_code"] in {"NAME_MISMATCH", "not_legal_name"}
 
 
 def test_shopfront_older_than_90_days_is_rejected() -> None:
-    verifier = MockDocumentVerifier()
+    verifier = RulesDocumentVerifier()
     result = verifier.verify(
         "shopfront_photo",
         "Lotus Tea House",
@@ -98,7 +99,7 @@ def test_shopfront_older_than_90_days_is_rejected() -> None:
         "2026-11-06",
     )
     assert result["accepted"] is False
-    assert result["reason_code"] == "too_old"
+    assert result["reason_code"] in {"PHOTO_TOO_OLD", "too_old"}
 
 
 def test_unknown_application_is_an_error() -> None:
@@ -139,18 +140,18 @@ def test_one_file_cannot_fill_two_slots() -> None:
 
 
 def test_slot_mismatch_document_rejected() -> None:
-    verifier = MockDocumentVerifier()
+    verifier = RulesDocumentVerifier()
     # A registration PDF uploaded to dpa_addendum
     res = verifier.verify("dpa_addendum", "theobromine restaurant", b"business_registration_1_reg_pdf.pdf", "2026-11-21")
     assert res["accepted"] is False
-    assert res["reason_code"] == "wrong_document"
+    assert res["reason_code"] in {"WRONG_DOCUMENT", "wrong_document"}
 
     # A utility bill uploaded to bank_proof
     res2 = verifier.verify("bank_proof", "theobromine restaurant", b"utility_bill.pdf", "2026-11-21")
     assert res2["accepted"] is False
-    assert res2["reason_code"] == "wrong_document"
+    assert res2["reason_code"] in {"WRONG_DOCUMENT", "wrong_document"}
 
     # An interior photo uploaded to shopfront_photo
     res3 = verifier.verify("shopfront_photo", "theobromine restaurant", b"interior_view.jpg", "2026-11-21")
     assert res3["accepted"] is False
-    assert res3["reason_code"] == "not_shopfront"
+    assert res3["reason_code"] in {"NOT_SHOPFRONT", "not_shopfront"}

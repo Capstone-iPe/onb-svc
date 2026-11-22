@@ -8,7 +8,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from onb.rules import decide, parse_volume, phone_stored
-from onb.verifier import MockDocumentVerifier, RulesDocumentVerifier, file_bytes
+from onb.verifier import RulesDocumentVerifier, file_bytes
 
 if TYPE_CHECKING:
     from onb.store import ApplicationStore
