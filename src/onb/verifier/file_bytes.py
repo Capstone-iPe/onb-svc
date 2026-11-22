@@ -5,9 +5,11 @@ from __future__ import annotations
 import base64
 
 
-def file_bytes(file: str | None) -> bytes:
+def file_bytes(file: str | bytes | None) -> bytes:
     if file is None:
         return b""
+    if isinstance(file, bytes):
+        return file
     text = file.strip()
     if text == "" or text.lower() == "attached":
         return b""

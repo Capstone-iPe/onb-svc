@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from onb.verifier.document_verifier import DocumentVerifier
+from onb.verifier.rules_document_verifier import RulesDocumentVerifier
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
@@ -92,60 +93,14 @@ _CODE_MAP = {
 
 class MockDocumentVerifier(DocumentVerifier):
     def __init__(self) -> None:
-        _load_fixtures()
+        self._rules = RulesDocumentVerifier()
 
     def verify(self, slot: str, shop_name: str, file: bytes, submit_date: str) -> dict:
         if not file:
             return {"accepted": False, "reason_code": "no_bytes"}
-        if _format(file) is None:
-            return {"accepted": False, "reason_code": "format"}
-
-        text = file.decode("utf-8", errors="ignore").strip()
-        lowered = text.lower()
-        legal_name = shop_name.strip().lower()
-
-        # Tier 0: Check synthetic fixtures table (by sha256 or filename hint)
-        digest = hashlib.sha256(file).hexdigest()
-        fix = _FIXTURES_BY_SHA.get(digest) or _FIXTURES_BY_FILE.get(Path(text).name)
-        if fix:
-            if fix.get("slot") != slot:
-                return {"accepted": False, "reason_code": "wrong_document"}
-            is_acc = fix.get("accepted") == "True"
-            code = fix.get("reason_code", "ACCEPTED" if is_acc else "WRONG_DOCUMENT")
-            return {
-                "accepted": is_acc,
-                "reason_code": _CODE_MAP.get(code, code.lower()),
-            }
-
-        # Generic reject test hook
-        if "reject" in lowered:
-            return {"accepted": False, "reason_code": "rejected"}
-
-        # Slot-kind validation based on keywords
-        if slot == "dpa_addendum":
-            if any(k in lowered for k in ("reg_pdf", "registration", "bank_letter", "passbook", "id_card", "shopfront")) and not any(k in lowered for k in ("addendum", "dpa")):
-                return {"accepted": False, "reason_code": "wrong_document"}
-        elif slot == "bank_proof":
-            if any(k in lowered for k in ("shopfront", "registration", "addendum", "utility_bill", "fssai", "udyam")) and not any(k in lowered for k in ("bank", "passbook", "cheque")):
-                return {"accepted": False, "reason_code": "wrong_document"}
-        elif slot == "business_registration":
-            if any(k in lowered for k in ("fssai", "udyam", "utility_bill", "passbook", "cheque", "addendum")) and not any(k in lowered for k in ("registration", "reg_")):
-                return {"accepted": False, "reason_code": "wrong_document"}
-        elif slot == "owner_id":
-            if any(k in lowered for k in ("selfie", "stamp", "portrait", "kyc_csv")):
-                return {"accepted": False, "reason_code": "wrong_document"}
-        elif slot == "shopfront_photo":
-            if any(k in lowered for k in ("interior", "render", "website", "menu")):
-                return {"accepted": False, "reason_code": "not_shopfront"}
-
-        if slot == "bank_proof" and "personal" in lowered and legal_name not in lowered:
-            return {"accepted": False, "reason_code": "not_legal_name"}
-        if legal_name and any(k in lowered for k in ("other_shop", "other_company", "different_shop")):
-            return {"accepted": False, "reason_code": "not_legal_name"}
-        if slot == "shopfront_photo" and _photo_too_old(text, submit_date):
-            return {"accepted": False, "reason_code": "too_old"}
-        if slot == "dpa_addendum" and "unsigned" in lowered:
-            return {"accepted": False, "reason_code": "unsigned"}
-        if "reject" in lowered:
-            return {"accepted": False, "reason_code": "rejected"}
-        return {"accepted": True, "reason_code": "ok"}
+        res = self._rules.verify(slot, shop_name, file, submit_date)
+        code = res.get("reason_code", "ok")
+        return {
+            "accepted": res["accepted"],
+            "reason_code": _CODE_MAP.get(code, code.lower()),
+        }

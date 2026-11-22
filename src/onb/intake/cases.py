@@ -8,7 +8,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from onb.rules import decide, parse_volume, phone_stored
-from onb.verifier import MockDocumentVerifier, file_bytes
+from onb.verifier import MockDocumentVerifier, RulesDocumentVerifier, file_bytes
 
 if TYPE_CHECKING:
     from onb.store import ApplicationStore
@@ -121,6 +121,18 @@ def save_answer(store: ApplicationStore, application_id: str, field: str, value:
     }
 
 
+_REASON_CODE_MAP = {
+    "ACCEPTED": "ok",
+    "FORMAT_UNSUPPORTED": "format",
+    "PHOTO_TOO_OLD": "too_old",
+    "NAME_MISMATCH": "not_legal_name",
+    "UNSIGNED": "unsigned",
+    "WRONG_DOCUMENT": "wrong_document",
+    "NOT_SHOPFRONT": "not_shopfront",
+    "FILE_UNREADABLE": "format",
+}
+
+
 def save_file(
     store: ApplicationStore,
     application_id: str,
@@ -176,11 +188,12 @@ def save_file(
         accepted, reason_code = False, "duplicate_file"
         tier, injection_flagged, evidence = 0, False, {}
     else:
-        checker = verifier or MockDocumentVerifier()
+        checker = verifier or RulesDocumentVerifier()
         shop_name = str(snapshot["answers"].get("shop_name") or "")
         result = checker.verify(slot, shop_name, payload, submit_date or date.today().isoformat())
         accepted = bool(result.get("accepted"))
-        reason_code = str(result.get("reason_code") or ("ok" if accepted else "rejected"))
+        raw_code = str(result.get("reason_code") or ("ok" if accepted else "rejected"))
+        reason_code = _REASON_CODE_MAP.get(raw_code, raw_code)
         tier = int(result.get("tier", 0))
         injection_flagged = bool(result.get("injection_flagged", False))
         evidence = result.get("evidence") or {}
