@@ -12,6 +12,7 @@ from mcp.shared.auth import OAuthClientInformationFull
 from pydantic import AnyUrl
 from starlette.responses import JSONResponse
 
+from onb.auth.redirects import allowed_emails_from_env
 from onb.auth import (
     GoogleAuthProvider,
     GoogleIdentity,
@@ -414,3 +415,13 @@ async def _call(app, method, path, query=None, json_body=None, form=None, extra_
         send,
     )
     return status["code"], status["headers"], b"".join(chunks)
+
+
+def test_the_gmail_list_is_ignored_unless_enforcement_is_on(monkeypatch):
+    monkeypatch.setenv("GOOGLE_ALLOWED_EMAILS", "owner@gmail.com")
+    monkeypatch.delenv("GOOGLE_ENFORCE_ALLOWED_EMAILS", raising=False)
+    assert allowed_emails_from_env() == frozenset()
+    monkeypatch.setenv("GOOGLE_ENFORCE_ALLOWED_EMAILS", "0")
+    assert allowed_emails_from_env() == frozenset()
+    monkeypatch.setenv("GOOGLE_ENFORCE_ALLOWED_EMAILS", "1")
+    assert allowed_emails_from_env() == frozenset({"owner@gmail.com"})

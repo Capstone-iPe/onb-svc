@@ -20,7 +20,18 @@ def public_base_url() -> str:
     return "http://127.0.0.1:8000"
 
 
+def enforce_allowed_emails() -> bool:
+    """True only when GOOGLE_ENFORCE_ALLOWED_EMAILS is 1, true, yes, or on."""
+    return os.environ.get("GOOGLE_ENFORCE_ALLOWED_EMAILS", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def allowed_emails_from_env() -> frozenset[str]:
+    """The Gmail list, or empty when enforcement is off.
+
+    An empty result means any verified Google account is accepted.
+    """
+    if not enforce_allowed_emails():
+        return frozenset()
     raw = os.environ.get("GOOGLE_ALLOWED_EMAILS", "")
     return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
 
