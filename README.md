@@ -2,7 +2,9 @@
 
 The onboarding rules service for the iPe Merchant Onboarding Copilot. One Python process. No model. The copilot calls it over MCP. This process owns the application, the files, and the verdict.
 
-The five tools are registered. `next_step` creates the application and returns the pending item plus the snapshot. `save_answer` stores the pending answer, or replaces an answer already stored before submit. After the verdict, a stored answer stays as stored. `save_file` stores one upload, or closes a slot the merchant does not have. After the verdict, a file for a missing slot updates the verdict and keeps the review id. The document verifier in this process is a mock. `submit` runs the rules and allocates one review id, unless the type is refused. `get_review` returns that stored verdict. It does not run the rules and it does not allocate an id.
+The five tools are registered. `next_step` creates the application and returns the pending item plus the snapshot. `save_answer` stores the pending answer, or replaces an answer already stored before submit. After the verdict, a stored answer stays as stored. `save_file` stores one upload, or closes a slot the merchant does not have. After the verdict, a file for a missing slot updates the verdict and keeps the review id. `submit` runs the rules and allocates one review id, unless the type is refused. `get_review` returns that stored verdict. It does not run the rules and it does not allocate an id.
+
+`save_file` calls the document verifier in this process. The default is the hosted-chat checker (`DOCUMENT_VERIFIER_MODE=llm`). `rules` is the deterministic checker and does not call the network. The verdict itself stays in `rules/` and does not call a model. [LLD-0001](https://github.com/Capstone-iPe/analysis/blob/main/docs/LLD-0001-document-verifier.md) is still a draft and still describes a rules-only checker.
 
 There is no activate, waive, change-volume, or mark-complete tool. [ADR-0001 D6](https://github.com/Capstone-iPe/analysis/blob/main/ADR-0001-architecture.md) keeps that list closed, so a prompt cannot reach those actions. Policy search stays in the copilot. `verify` stays inside this process.
 
