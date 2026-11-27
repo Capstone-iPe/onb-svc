@@ -22,17 +22,35 @@ src/onb/log/          The lines Render keeps.
 src/onb/postgres/     The database connection.
 ```
 
-## Run
+## Run locally
+
+Python 3.12. PostgreSQL 16 when you want applications to survive a restart. The other three processes are [onb-corpus](https://github.com/Capstone-iPe/onb-corpus) on port 8081, [copilot-svc](https://github.com/Capstone-iPe/copilot-svc) on port 8080, and [copilot-web-app](https://github.com/Capstone-iPe/copilot-web-app) on port 5000. Clone them next to this repository. The full start order, the Google client, and the hosted keys are in the [analysis README](https://github.com/Capstone-iPe/analysis#run-the-services-locally).
 
 ```bash
-python3 -m venv .venv
+git clone https://github.com/Capstone-iPe/onb-svc.git
+cd onb-svc
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 pytest
+createdb ipe_onb
+cp .env.example .env
+```
+
+Fill `.env`. This process reads the environment. It does not open `.env` itself, so load the file in the shell and then start:
+
+```bash
+set -a
+source .env
+set +a
 python -m onb
 ```
 
-`python -m onb` listens on `http://0.0.0.0:8000/mcp`. Render sets `PORT`; locally the port is 8000. `GET /health` is the health check and stays open. Ctrl+C stops it.
+`python -m onb` listens on `http://0.0.0.0:8000/mcp`. Render sets `PORT`; locally the port is 8000. `GET /health` is the health check and stays open. `curl -sS http://127.0.0.1:8000/health` prints `{"status":"ok"}`. Ctrl+C stops it.
+
+`.env.example` points `DATABASE_URL` at `postgresql://localhost:5432/ipe_onb`, `ONB_PUBLIC_URL` at `http://127.0.0.1:8000`, and `CORPUS_SEARCH_URL` at `http://127.0.0.1:8081`. Use the same `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as the website. Register `http://127.0.0.1:8000/auth/google/callback` on that Google client. `CORPUS_API_KEY` is the secret you chose for onb-corpus. `CHAT_API_KEY` and `CHAT_CA_CERT` are the hosted chat key and `vm06-ca.crt`. Give `CHAT_CA_CERT` an absolute path. Without `CHAT_API_KEY`, a document check uses the rules checker. Set `DOCUMENT_VERIFIER_MODE=rules` to force that checker.
+
+Without `DATABASE_URL`, applications stay in memory and disappear when the process stops. Without `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, `/mcp` does not ask for a bearer token. The website path still needs both, because the copilot forwards the merchant's Google access token and ONB checks it with Google.
 
 When `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, `/mcp` answers 401 until the caller sends a bearer token. A call that brought no token is a sign-in challenge. The header names the discovery document and does not call the token invalid. Claude and ChatGPT open a browser, this process sends that browser to Google, and Google returns it to `/auth/google/callback`. This process then hands their app Google's access token. Every later `/mcp` call asks Google whether that token is still valid. The secret stays in the environment. `ONB_PUBLIC_URL` is the public origin, with no path. On Render it defaults to `https://onb-k8ud.onrender.com`, which is the redirect already registered with Google. `GOOGLE_ALLOWED_EMAILS` is an optional comma-separated list. It is applied only when `GOOGLE_ENFORCE_ALLOWED_EMAILS` is `1`, `true`, `yes`, or `on`. That flag is off, so any verified Google account that passes Google's consent screen is accepted. `GOOGLE_ALLOWED_AUDIENCES` may list extra Google client ids whose access tokens this process also accepts, for example the web app's client id when it differs from `GOOGLE_CLIENT_ID`. A restart drops in-progress sign-in and refresh handles. The person signs in again. A Google access token that is still valid with Google still works after a restart. The client registration is kept in Postgres, so ChatGPT can still find the client id after a restart.
 
